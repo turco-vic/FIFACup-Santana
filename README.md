@@ -280,10 +280,10 @@ Admin cria jogador
 - [x] Configurar Supabase Auth e trigger de criação de perfil
 
 ### Fase 2 — Admin e Jogadores
-- [ ] Página de login do admin
-- [ ] Painel admin: cadastrar jogadores (nome + e-mail + senha temporária)
-- [ ] Página de perfil do jogador (username, avatar, time, troca de senha)
-- [ ] Upload de avatar para o Supabase Storage
+- [x] Página de login do admin
+- [x] Painel admin: cadastrar jogadores (nome + e-mail + senha temporária)
+- [x] Página de perfil do jogador (username, avatar, time, troca de senha)
+- [x] Upload de avatar para o Supabase Storage
 
 ### Fase 3 — Sorteio
 - [ ] Lógica de sorteio dos grupos 1v1 (`draw.ts`)
