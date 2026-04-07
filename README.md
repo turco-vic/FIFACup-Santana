@@ -286,10 +286,10 @@ Admin cria jogador
 - [x] Upload de avatar para o Supabase Storage
 
 ### Fase 3 — Sorteio
-- [ ] Lógica de sorteio dos grupos 1v1 (`draw.ts`)
-- [ ] Lógica de formação das duplas 2v2
-- [ ] Geração automática das partidas da fase de grupos e liga
-- [ ] Página de visualização do sorteio
+- [x] Lógica de sorteio dos grupos 1v1 (`draw.ts`)
+- [x] Lógica de formação das duplas 2v2
+- [x] Geração automática das partidas da fase de grupos e liga
+- [x] Página de visualização do sorteio
 
 ### Fase 4 — Tabelas e Resultados
 - [ ] Tabela de grupos 1v1 com cálculo de pontos
