@@ -105,14 +105,26 @@ export default function Home() {
         </div>
 
         {/* Botão instalar PWA */}
-        {installPrompt && !isInstalled && (
-          <button
-            onClick={install}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-white/20 text-white hover:bg-white/10 transition mb-6 text-sm font-medium"
-          >
-            <Download size={16} style={{ color: 'var(--color-gold)' }} />
-            Instalar app no celular
-          </button>
+        {!isInstalled && (
+          <div className="mb-6">
+            {installPrompt ? (
+              <button
+                onClick={install}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-white/20 text-white hover:bg-white/10 transition text-sm font-medium"
+              >
+                <Download size={16} style={{ color: 'var(--color-gold)' }} />
+                Instalar app no celular
+              </button>
+            ) : (
+              <div className="px-4 py-3 rounded-xl border border-white/10 bg-white/5">
+                <p className="text-white/60 text-xs text-center">
+                  📱 Para instalar o app: no seu navegador, toque em{' '}
+                  <span className="text-white font-medium">Compartilhar</span> →{' '}
+                  <span className="text-white font-medium">Adicionar à Tela de Início</span>
+                </p>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Atalhos */}
