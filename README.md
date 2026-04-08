@@ -321,8 +321,8 @@ Admin cria jogador
 
 - [x] Página Home com próximas partidas e resultados recentes
 - [ ] Responsividade mobile
-- [ ] Configurar projeto na Vercel
-- [ ] Variáveis de ambiente na Vercel
+- [x] Configurar projeto na Vercel
+- [x] Variáveis de ambiente na Vercel
 - [ ] Testes finais e ajustes
 
 ---
