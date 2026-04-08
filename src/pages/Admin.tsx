@@ -134,7 +134,7 @@ export default function Admin() {
                         <h1 className="text-2xl font-bold" style={{ color: 'var(--color-gold)' }}>
                             Painel Admin
                         </h1>
-                        <p className="text-white/40 text-sm mt-0.5">FIFACup Santana</p>
+                        <p className="text-white/40 text-sm mt-0.5">FifaCup Santana</p>
                     </div>
                     <button
                         onClick={handleSignOut}
@@ -322,41 +322,67 @@ export default function Admin() {
                 </div>
 
                 {/* Zona de Perigo */}
-                <div className="rounded-xl border border-red-500/20 overflow-hidden">
-                    <div className="px-4 py-3 border-b border-red-500/20 flex items-center gap-2"
-                        style={{ backgroundColor: 'rgba(239,68,68,0.05)' }}>
+                <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(239,68,68,0.4)', backgroundColor: '#0a1f17' }}>
+                    <div
+                        className="px-4 py-3 border-b flex items-center gap-2"
+                        style={{ backgroundColor: '#1a0a0a', borderColor: 'rgba(239,68,68,0.4)' }}
+                    >
                         <AlertTriangle size={14} className="text-red-400" />
                         <h2 className="font-bold text-sm text-red-400">Zona de Perigo</h2>
                     </div>
-                    <div className="px-4 py-4">
-                        <p className="text-white/40 text-sm mb-4">
-                            Reseta todos os grupos, duplas e partidas. Os jogadores permanecem cadastrados.
+
+                    <div className="px-4 py-5" style={{ backgroundColor: '#0a1f17' }}>
+                        <p className="text-white/50 text-sm mb-5">
+                            Apaga todos os grupos, duplas e partidas do campeonato atual. Os jogadores permanecem cadastrados para o próximo campeonato.
                         </p>
+
                         {!showConfirm ? (
                             <button
                                 onClick={() => setShowConfirm(true)}
-                                className="w-full py-3 rounded-lg font-bold text-red-400 border border-red-500/30 hover:bg-red-500/10 transition"
+                                className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition"
+                                style={{
+                                    border: '1px solid rgba(239,68,68,0.5)',
+                                    color: 'rgb(248,113,113)',
+                                    backgroundColor: 'rgba(239,68,68,0.1)',
+                                }}
+                                onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.2)')}
+                                onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.1)')}
                             >
+                                <AlertTriangle size={15} />
                                 Resetar Campeonato
                             </button>
                         ) : (
-                            <div className="flex flex-col gap-3">
-                                <p className="text-red-400 text-sm text-center font-bold">
-                                    Tem certeza? Essa ação não pode ser desfeita!
-                                </p>
+                            <div className="flex flex-col gap-4">
+                                <div
+                                    className="px-4 py-3 rounded-xl text-center"
+                                    style={{ backgroundColor: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)' }}
+                                >
+                                    <p className="text-red-400 font-bold text-sm">⚠️ Atenção!</p>
+                                    <p className="text-red-300/80 text-xs mt-1">
+                                        Essa ação é irreversível. Todos os resultados e partidas serão perdidos.
+                                    </p>
+                                </div>
                                 <div className="flex gap-3">
                                     <button
                                         onClick={() => setShowConfirm(false)}
-                                        className="flex-1 py-3 rounded-lg text-white border border-white/20 hover:bg-white/10 transition font-medium"
+                                        className="flex-1 py-3 rounded-xl text-white border border-white/20 hover:bg-white/10 transition font-medium text-sm"
                                     >
                                         Cancelar
                                     </button>
                                     <button
                                         onClick={handleReset}
                                         disabled={resetting}
-                                        className="flex-1 py-3 rounded-lg font-bold text-white bg-red-500 hover:bg-red-600 transition"
+                                        className="flex-1 py-3 rounded-xl font-bold text-white text-sm transition flex items-center justify-center gap-2"
+                                        style={{ backgroundColor: 'rgb(220,38,38)' }}
+                                        onMouseEnter={e => !resetting && (e.currentTarget.style.backgroundColor = 'rgb(185,28,28)')}
+                                        onMouseLeave={e => !resetting && (e.currentTarget.style.backgroundColor = 'rgb(220,38,38)')}
                                     >
-                                        {resetting ? 'Resetando...' : 'Confirmar'}
+                                        {resetting ? 'Resetando...' : (
+                                            <>
+                                                <AlertTriangle size={14} />
+                                                Confirmar Reset
+                                            </>
+                                        )}
                                     </button>
                                 </div>
                             </div>
