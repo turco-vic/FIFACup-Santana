@@ -11,6 +11,7 @@ import Profile from './pages/Profile'
 import Admin from './pages/Admin'
 import PlayerProfile from './pages/PlayerProfile'
 import NotFound from './pages/NotFound'
+import ResetPassword from './pages/ResetPassword'
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
       <Routes>
         {/* Pública */}
         <Route path="/login" element={<Login />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Protegidas */}
         <Route path="/*" element={
