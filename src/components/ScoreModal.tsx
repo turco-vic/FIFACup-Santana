@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Match } from '../types'
 import { X } from 'lucide-react'
+import { useToast } from '../contexts/ToastContext'
 
 type Props = {
     match: Match
@@ -11,9 +12,7 @@ type Props = {
 }
 
 async function generateNextRound(match: Match, homeScore: number, awayScore: number) {
-
     if (match.stage === 'quarters') {
-        // Busca todas as quartas
         const { data: quarters } = await supabase
             .from('matches')
             .select('*')
@@ -23,7 +22,6 @@ async function generateNextRound(match: Match, homeScore: number, awayScore: num
 
         if (!quarters) return
 
-        // Atualiza o resultado atual na lista local
         const updated = quarters.map(q =>
             q.id === match.id
                 ? { ...q, home_score: homeScore, away_score: awayScore, played: true }
@@ -33,7 +31,6 @@ async function generateNextRound(match: Match, homeScore: number, awayScore: num
         const allPlayed = updated.every(q => q.played)
         if (!allPlayed) return
 
-        // Gera semifinais: Q1 vs Q2, Q3 vs Q4
         const winners = updated.map(q =>
             (q.home_score ?? 0) > (q.away_score ?? 0) ? q.home_id : q.away_id
         )
@@ -46,7 +43,6 @@ async function generateNextRound(match: Match, homeScore: number, awayScore: num
     }
 
     if (match.stage === 'semis') {
-        // Busca todas as semis
         const { data: semis } = await supabase
             .from('matches')
             .select('*')
@@ -77,21 +73,26 @@ async function generateNextRound(match: Match, homeScore: number, awayScore: num
 }
 
 export default function ScoreModal({ match, homeName, awayName, onClose }: Props) {
+    const { showToast } = useToast()
     const [homeScore, setHomeScore] = useState(match.home_score?.toString() ?? '')
     const [awayScore, setAwayScore] = useState(match.away_score?.toString() ?? '')
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState('')
 
+    const isKnockout = ['quarters', 'semis', 'final'].includes(match.stage)
+
     async function handleSave() {
         const hs = parseInt(homeScore)
         const as_ = parseInt(awayScore)
+
+        console.log('handleSave chamado', hs, as_)
 
         if (isNaN(hs) || isNaN(as_) || hs < 0 || as_ < 0) {
             setError('Placar inválido.')
             return
         }
 
-        if (hs === as_) {
+        if (isKnockout && hs === as_) {
             setError('Empate não permitido no mata-mata. Use pênaltis para desempatar.')
             return
         }
@@ -103,22 +104,22 @@ export default function ScoreModal({ match, homeName, awayName, onClose }: Props
             .update({ home_score: hs, away_score: as_, played: true })
             .eq('id', match.id)
 
+        console.log('Supabase update result:', error)
+
         if (error) {
             setError('Erro ao salvar.')
             setSaving(false)
             return
         }
 
-        // Gera próxima fase automaticamente
         if (['quarters', 'semis'].includes(match.stage)) {
             await generateNextRound(match, hs, as_)
         }
 
+        console.log('Toast chamado!')
+        showToast('Resultado salvo com sucesso!')
         onClose()
     }
-
-    const isKnockout = ['quarters', 'semis', 'final'].includes(match.stage)
-
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
             <div
@@ -183,7 +184,6 @@ export default function ScoreModal({ match, homeName, awayName, onClose }: Props
                         {saving ? 'Salvando...' : 'Salvar'}
                     </button>
                 </div>
-
             </div>
         </div>
     )

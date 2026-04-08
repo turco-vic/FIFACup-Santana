@@ -14,7 +14,7 @@ export default function Toast({ message, type = 'success', onClose }: Props) {
     }, [onClose])
 
     return (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg"
+        <div className="fixed top-6 right-6 z-[100] flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg"
             style={{
                 backgroundColor: 'var(--color-green)',
                 borderColor: type === 'success' ? 'rgba(74,222,128,0.3)' : 'rgba(248,113,113,0.3)',
