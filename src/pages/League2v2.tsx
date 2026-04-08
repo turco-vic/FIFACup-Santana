@@ -9,6 +9,7 @@ import type { Profile, Duo, Match } from '../types'
 import { Pencil, Plus, Trophy } from 'lucide-react'
 import { generate2v2Final } from '../lib/draw'
 import { Skeleton, SkeletonTable, SkeletonMatch } from '../components/Skeleton'
+import DuoModal from '../components/DuoModal'
 
 type DuoWithPlayers = Duo & {
   player1: Profile
@@ -23,6 +24,7 @@ export default function League2v2() {
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
   const [generatingFinal, setGeneratingFinal] = useState(false)
   const [message, setMessage] = useState('')
+  const [selectedDuo, setSelectedDuo] = useState<DuoWithPlayers | null>(null)
 
   useEffect(() => {
     async function fetchDuos() {
@@ -141,7 +143,14 @@ export default function League2v2() {
             </h2>
           </div>
           <div className="px-2 py-2">
-            <GroupTable standings={standings} qualifiers={0} />
+            <GroupTable
+              standings={standings}
+              qualifiers={0}
+              onClickRow={(id) => {
+                const duo = duos.find(d => d.id === id)
+                if (duo) setSelectedDuo(duo)
+              }}
+            />
           </div>
         </div>
 
@@ -267,6 +276,14 @@ export default function League2v2() {
           homeName={getDuoNameById(selectedMatch.home_id)}
           awayName={getDuoNameById(selectedMatch.away_id)}
           onClose={() => setSelectedMatch(null)}
+        />
+      )}
+
+      {selectedDuo && (
+        <DuoModal
+          duo={selectedDuo}
+          matches={leagueMatches}
+          onClose={() => setSelectedDuo(null)}
         />
       )}
     </div>

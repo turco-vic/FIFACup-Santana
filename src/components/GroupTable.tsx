@@ -3,9 +3,11 @@ import type { Standing } from '../types'
 type Props = {
     standings: Standing[]
     qualifiers?: number
+    onClickRow?: (id: string) => void
 }
 
-export default function GroupTable({ standings, qualifiers = 2 }: Props) {
+
+export default function GroupTable({ standings, qualifiers = 2, onClickRow }: Props) {
     return (
         <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -25,7 +27,8 @@ export default function GroupTable({ standings, qualifiers = 2 }: Props) {
                     {standings.map((s, i) => (
                         <tr
                             key={s.id}
-                            className={`border-t border-white/5 ${qualifiers > 0 && i < qualifiers ? 'bg-green-500/5' : ''}`}
+                            onClick={() => onClickRow?.(s.id)}
+                            className={`border-t border-white/5 ${qualifiers > 0 && i < qualifiers ? 'bg-green-500/5' : ''} ${onClickRow ? 'cursor-pointer hover:bg-white/5 transition' : ''}`}
                         >
                             <td className="py-2.5 pl-3 text-white/40 text-xs">{i + 1}</td>
                             <td className="py-2.5 pr-2">
