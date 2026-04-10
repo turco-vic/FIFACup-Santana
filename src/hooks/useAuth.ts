@@ -82,6 +82,10 @@ export function useAuth() {
       },
     })
 
+    if (!error) {
+      await supabase.auth.signOut()
+    }
+
     return { error }
   }
 

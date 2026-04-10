@@ -2,24 +2,24 @@ import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { FaInstagram, FaLinkedin } from 'react-icons/fa'
-import { X, Menu, Users, Shield, Home, User } from 'lucide-react'
+import { X, Menu, Users, Shield, Home, User, Trophy } from 'lucide-react'
 
 export default function Sidebar() {
     const { profile, isSupreme } = useAuth()
     const location = useLocation()
     const [open, setOpen] = useState(false)
 
-    // Supreme: vê lista global de usuários + painel supreme
-    // Player/Admin: vê home, perfil — jogadores é por campeonato
     const items = isSupreme
         ? [
             { path: '/', label: 'Home', icon: Home },
+            { path: '/tournaments', label: 'Campeonatos', icon: Trophy },
             { path: '/players', label: 'Todos os usuários', icon: Users },
             { path: '/admin', label: 'Painel Supreme', icon: Shield },
             { path: '/profile', label: 'Meu Perfil', icon: User },
         ]
         : [
             { path: '/', label: 'Home', icon: Home },
+            { path: '/tournaments', label: 'Meus campeonatos', icon: Trophy },
             { path: '/profile', label: 'Meu Perfil', icon: User },
         ]
 
@@ -34,13 +34,13 @@ export default function Sidebar() {
 
             {open && (
                 <div
-                    className="fixed inset-0 z-50 bg-black/60"
+                    className="fixed inset-0 z-[60] bg-black/60"
                     onClick={() => setOpen(false)}
                 />
             )}
 
             <div
-                className={`fixed top-0 right-0 h-full z-50 w-72 flex flex-col transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full'}`}
+                className={`fixed top-0 right-0 h-full z-[70] w-72 flex flex-col overflow-hidden transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full'}`}
                 style={{ backgroundColor: '#081f16', borderLeft: '1px solid rgba(255,255,255,0.1)' }}
             >
                 <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
@@ -50,10 +50,7 @@ export default function Sidebar() {
                             FifaCup <span className="text-white">Santana</span>
                         </span>
                     </div>
-                    <button
-                        onClick={() => setOpen(false)}
-                        className="text-white/40 hover:text-white transition"
-                    >
+                    <button onClick={() => setOpen(false)} className="text-white/40 hover:text-white transition">
                         <X size={20} />
                     </button>
                 </div>
@@ -86,7 +83,7 @@ export default function Sidebar() {
                     </div>
                 )}
 
-                <div className="flex flex-col p-4 gap-1 flex-1">
+                <div className="flex flex-col p-4 gap-1 flex-1 min-h-0 overflow-y-auto">
                     {items.map(({ path, label, icon: Icon }) => (
                         <Link
                             key={path}
@@ -113,23 +110,15 @@ export default function Sidebar() {
                     ))}
                 </div>
 
-                <div className="px-5 py-4 border-t border-white/10 flex flex-col items-center gap-3">
+                <div className="px-5 py-4 border-t border-white/10 flex flex-col items-center gap-3 flex-shrink-0">
                     <p className="text-white/30 text-xs">Desenvolvido por Turco</p>
                     <div className="flex items-center gap-4">
-                        <a
-                            href="https://www.instagram.com/turco.vic"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-white/30 hover:text-white transition"
-                        >
+                        <a href="https://www.instagram.com/turco.vic" target="_blank" rel="noopener noreferrer"
+                            className="text-white/30 hover:text-white transition">
                             <FaInstagram size={20} />
                         </a>
-                        <a
-                            href="https://www.linkedin.com/in/enzoturcovic/"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-white/30 hover:text-white transition"
-                        >
+                        <a href="https://www.linkedin.com/in/enzoturcovic/" target="_blank" rel="noopener noreferrer"
+                            className="text-white/30 hover:text-white transition">
                             <FaLinkedin size={20} />
                         </a>
                     </div>

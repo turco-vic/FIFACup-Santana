@@ -20,6 +20,7 @@ import CreateTournament from './pages/CreateTournament'
 import JoinTournament from './pages/JoinTournament'
 import TournamentDashboard from './pages/TournamentDashboard'
 import TournamentManage from './pages/TournamentManage'
+import Tournaments from './pages/Tournaments'
 
 function App() {
   return (
@@ -47,6 +48,7 @@ function App() {
                 <Route path="/tournaments/join" element={<JoinTournament />} />
                 <Route path="/tournament/:id" element={<TournamentDashboard />} />
                 <Route path="/tournament/:id/manage" element={<TournamentManage />} />
+                <Route path="/tournaments" element={<Tournaments />} />
 
                 <Route path="/draw" element={
                   <ProtectedRoute supremeOnly>
