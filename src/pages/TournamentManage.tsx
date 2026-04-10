@@ -306,7 +306,6 @@ export default function TournamentManage() {
 
     const is2v2 = tournament.mode === '2v2'
     const allPlayerIds = players.map(p => p.player_id)
-    const usedIds = getUsedPlayerIds()
     const availableForSelection = allPlayerIds.filter(pid => {
         if (!selectingFor) return false
         const { duoIndex, slot } = selectingFor
