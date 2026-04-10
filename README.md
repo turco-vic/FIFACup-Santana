@@ -120,21 +120,21 @@ O admin controla tudo via painel protegido: cadastra jogadores, realiza o sortei
 ### 1v1 — Fase de Grupos + Mata-mata
  
 ```
-┌──────────────────────────────────────────────────────────┐
-│                    FASE DE GRUPOS                        │
-│                                                          │
+┌──────────────────────────────────────────────────────────────┐
+│                    FASE DE GRUPOS                            │
+│                                                              │
 │  ┌─ Grupo A ─┐  ┌─ Grupo B ─┐  ┌─ Grupo C ─┐  ┌─ Grupo D ─┐  │
 │  │ Jogador 1 │  │ Jogador 4 │  │ Jogador 7 │  │Jogador 10 │  │
 │  │ Jogador 2 │  │ Jogador 5 │  │ Jogador 8 │  │Jogador 11 │  │
 │  │ Jogador 3 │  │ Jogador 6 │  │ Jogador 9 │  │Jogador 12 │  │
 │  └───────────┘  └───────────┘  └───────────┘  └───────────┘  │
 │         ↓ 2 melhores de cada grupo avançam ↓                 │
-└──────────────────────────────────────────────────────────┘
+└──────────────────────────────────────────────────────────────┘
                           ↓
 ┌──────────────────────────────────────────────────────────┐
 │                      MATA-MATA                           │
 │                                                          │
-│  QUARTAS (8)  →  SEMIFINAIS (4)  →  FINAL (2)  →  🏆   │
+│  QUARTAS (8)  →  SEMIFINAIS (4)  →  FINAL (2)  →  🏆     │ 
 │                                                          │
 │  Empate? → Disputa de pênaltis                           │
 └──────────────────────────────────────────────────────────┘
