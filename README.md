@@ -49,7 +49,7 @@
 
 ## 🎮 Sobre o Projeto — De uma resenha em casa com amigos para a Web
  
-O **FifaCup Santana** nasceu da necessidade de transformar o caos em organização. O que começou como uma resenha entre amigos para jogar FIFA na casa de alguém revelou um problema comum: a falta de ferramentas ágeis e intuitivas para gerenciar campeonatos amadores.
+O **FIFACup Santana** nasceu da necessidade de transformar o caos em organização. O que começou como uma resenha entre amigos para jogar FIFA na casa de alguém revelou um problema comum: a falta de ferramentas ágeis e intuitivas para gerenciar campeonatos amadores.
  
 ### 🚀 A Motivação
  
@@ -61,7 +61,7 @@ Ao tentar organizar os torneios, ficou claro que as soluções existentes eram o
  
 ### 🛠️ Diferenciais Técnicos
  
-Diferente de sistemas genéricos, o FifaCup Santana foi construído com foco em **usabilidade sob pressão** (durante os jogos, no celular) e **escalabilidade** — o que era uma solução caseira hoje funciona como um sistema web completo com realtime, PWA e notificações push.
+Diferente de sistemas genéricos, o FIFACup Santana foi construído com foco em **usabilidade sob pressão** (durante os jogos, no celular) e **escalabilidade** — o que era uma solução caseira hoje funciona como um sistema web completo com realtime, PWA e notificações push.
  
 Com 12 a 14 participantes, o sistema roda dois torneios **paralelos e independentes** ao mesmo tempo:
  
@@ -508,8 +508,8 @@ O projeto foi construído do zero em **3 dias**, do setup ao deploy completo.
  
 ```bash
 # Clone o repositório
-git clone https://github.com/turco-vic/FifaCup-Santana.git
-cd FifaCup-Santana
+git clone https://github.com/turco-vic/FIFACup-Santana.git
+cd FIFACup-Santana
  
 # Instale as dependências
 npm install
