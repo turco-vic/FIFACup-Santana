@@ -10,14 +10,41 @@ export default function ResetPassword() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [ready, setReady] = useState(false)
+  const [checking, setChecking] = useState(true)
 
   useEffect(() => {
-    // Supabase captura o token da URL automaticamente via onAuthStateChange
-    supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
+    async function init() {
+      // Tenta pegar sessão existente primeiro
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
         setReady(true)
+        setChecking(false)
+        return
       }
-    })
+
+      // Escuta evento de PASSWORD_RECOVERY ou SIGNED_IN via hash token
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
+          if (session) {
+            setReady(true)
+            setChecking(false)
+          }
+        }
+        if (event === 'SIGNED_OUT') {
+          setReady(false)
+          setChecking(false)
+        }
+      })
+
+      // Timeout — se após 5s não tiver sessão, mostra erro
+      setTimeout(() => {
+        setChecking(false)
+      }, 5000)
+
+      return () => subscription.unsubscribe()
+    }
+
+    init()
   }, [])
 
   async function handleReset() {
@@ -32,7 +59,7 @@ export default function ResetPassword() {
     const { error } = await supabase.auth.updateUser({ password })
 
     if (error) {
-      setError('Erro ao atualizar senha. Tente novamente.')
+      setError(`Erro: ${error.message}`)
       setSaving(false)
       return
     }
@@ -40,12 +67,29 @@ export default function ResetPassword() {
     navigate('/')
   }
 
-  if (!ready) {
+  if (checking) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="text-center">
-          <p className="text-white mb-2">Verificando link de redefinição...</p>
-          <p className="text-white/40 text-sm">Se nada acontecer, solicite um novo link.</p>
+          <div className="w-8 h-8 border-2 border-white/20 border-t-yellow-500 rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-white mb-2">Verificando link...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!ready) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="text-center flex flex-col items-center gap-4">
+          <p className="text-white/60">Link inválido ou expirado.</p>
+          <button
+            onClick={() => navigate('/login')}
+            className="px-6 py-3 rounded-xl font-bold transition hover:opacity-90"
+            style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
+          >
+            Voltar ao login
+          </button>
         </div>
       </div>
     )
@@ -69,6 +113,7 @@ export default function ResetPassword() {
               value={password}
               onChange={e => setPassword(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleReset()}
+              autoComplete="new-password"
               className="w-full px-4 py-3 rounded-lg bg-white/10 text-white placeholder-white/40 border border-white/20 focus:outline-none focus:border-yellow-500 pr-12"
             />
             <button

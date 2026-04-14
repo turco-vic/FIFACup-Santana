@@ -30,7 +30,6 @@ export default function ProtectedRoute({ children, supremeOnly = false }: Props)
         return <Navigate to="/login" replace />
     }
 
-    // Conta pendente ou bloqueada → login (useAuth já faz signOut, mas por segurança)
     if (profile.status !== 'active') {
         return <Navigate to="/login" replace />
     }

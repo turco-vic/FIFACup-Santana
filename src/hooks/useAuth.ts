@@ -7,14 +7,8 @@ export function useAuth() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        fetchProfile(session.user.id)
-      } else {
-        setLoading(false)
-      }
-    })
-
+    // onAuthStateChange já dispara INITIAL_SESSION no mount
+    // não precisa de getSession separado
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         fetchProfile(session.user.id)
@@ -43,7 +37,6 @@ export function useAuth() {
 
     if (error) return { error }
 
-    // Bloquear login se conta ainda pendente
     if (data.user) {
       const { data: profileData } = await supabase
         .from('profiles')
@@ -93,7 +86,6 @@ export function useAuth() {
     await supabase.auth.signOut()
   }
 
-  // Helpers de role/status
   const isSupreme = profile?.role === 'supreme'
   const isActive = profile?.status === 'active'
   const isPending = profile?.status === 'pending'

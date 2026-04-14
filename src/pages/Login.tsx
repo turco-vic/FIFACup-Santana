@@ -25,7 +25,7 @@ export default function Login() {
     async function handleResetPassword() {
         if (!resetEmail) return
         await supabase.auth.resetPasswordForEmail(resetEmail, {
-            redirectTo: 'https://fifacup-santana.vercel.app/reset-password',
+            redirectTo: `${window.location.origin}/reset-password`,
         })
         setResetSent(true)
     }
