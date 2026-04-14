@@ -11,6 +11,8 @@ import {
 } from 'lucide-react'
 import { Skeleton } from '../components/Skeleton'
 import ScoreModal from '../components/ScoreModal'
+import Confetti from '../components/Confetti'
+import KnockoutBracket from '../components/KnockoutBracket'
 
 const FORMAT_LABEL: Record<string, string> = {
     groups_knockout: 'Grupos + Mata-mata',
@@ -20,7 +22,8 @@ const FORMAT_LABEL: Record<string, string> = {
 }
 
 const STAGE_LABEL: Record<string, string> = {
-    groups: 'Grupos', quarters: 'Quartas', semis: 'Semifinal',
+    groups: 'Grupos', round32: '16avos', round16: 'Oitavas',
+    quarters: 'Quartas', semis: 'Semifinal',
     final: 'Final', league: 'Liga', knockout: 'Mata-mata',
 }
 
@@ -30,7 +33,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
     finished: { label: 'Encerrado', color: 'text-white/30', bg: 'bg-white/5' },
 }
 
-type Tab = 'partidas' | 'jogadores'
+type Tab = 'partidas' | 'jogadores' | 'estatisticas'
 
 type DuoWithPlayers = {
     id: string
@@ -63,6 +66,8 @@ export default function TournamentDashboard() {
     const [selectedDuo, setSelectedDuo] = useState<DuoWithPlayers | null>(null)
     const [notMember, setNotMember] = useState(false)
     const [generatingFinal, setGeneratingFinal] = useState(false)
+    const [generatingBracket, setGeneratingBracket] = useState(false)
+    const [showConfetti, setShowConfetti] = useState(false)
 
     useEffect(() => {
         if (authLoading) return
@@ -160,6 +165,100 @@ export default function TournamentDashboard() {
         fetchAll(id)
     }
 
+    function getGroupStandingsForBracket(group: GroupData) {
+        const gMatches = matches.filter(m =>
+            m.stage === 'groups' &&
+            group.players.some(p => p.id === m.home_id) &&
+            group.players.some(p => p.id === m.away_id)
+        )
+        const standings: Record<string, { id: string; points: number; gd: number; gf: number }> = {}
+        group.players.forEach(p => { standings[p.id] = { id: p.id, points: 0, gd: 0, gf: 0 } })
+        gMatches.filter(m => m.played).forEach(m => {
+            const hs = m.home_score ?? 0
+            const as_ = m.away_score ?? 0
+            standings[m.home_id].gf += hs; standings[m.home_id].gd += hs - as_
+            standings[m.away_id].gf += as_; standings[m.away_id].gd += as_ - hs
+            if (hs > as_) standings[m.home_id].points += 3
+            else if (as_ > hs) standings[m.away_id].points += 3
+            else { standings[m.home_id].points += 1; standings[m.away_id].points += 1 }
+        })
+        return Object.values(standings).sort(
+            (a, b) => b.points - a.points || b.gd - a.gd || b.gf - a.gf
+        )
+    }
+
+    async function handleGenerateQuarters() {
+        if (!tournament || !id || groups.length === 0) return
+        setGeneratingBracket(true)
+        const groupStandings = groups.map(g => getGroupStandingsForBracket(g))
+        const pairs: [number, number][] = groups.length === 4
+            ? [[0, 1], [2, 3], [1, 0], [3, 2]]
+            : groups.map((_, i) => [i, (i + 1) % groups.length] as [number, number])
+        const quarterMatches = pairs.map(([gi, gi2], idx) => ({
+            tournament_id: id, mode: tournament.mode, stage: 'quarters' as const,
+            home_id: groupStandings[gi][0]?.id, away_id: groupStandings[gi2][1]?.id,
+            match_order: idx, played: false,
+        })).filter(m => m.home_id && m.away_id)
+        await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', 'quarters')
+        await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', 'semis')
+        await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', 'final')
+        await supabase.from('matches').insert(quarterMatches)
+        setGeneratingBracket(false)
+        fetchAll(id)
+    }
+
+    async function handleGenerateSemis() {
+        if (!tournament || !id) return
+        setGeneratingBracket(true)
+        const quarters = matches
+            .filter(m => m.stage === 'quarters')
+            .sort((a, b) => (a.match_order ?? 0) - (b.match_order ?? 0))
+        const getWinner = (m: Match): string | null =>
+            m.played && m.home_score !== null && m.away_score !== null
+                ? m.home_score > m.away_score ? m.home_id : m.away_id
+                : null
+        const semiMatches = []
+        if (quarters.length === 4) {
+            const s1h = getWinner(quarters[0]), s1a = getWinner(quarters[2])
+            const s2h = getWinner(quarters[1]), s2a = getWinner(quarters[3])
+            if (s1h && s1a) semiMatches.push({ tournament_id: id, mode: tournament.mode, stage: 'semis', home_id: s1h, away_id: s1a, played: false, match_order: 0 })
+            if (s2h && s2a) semiMatches.push({ tournament_id: id, mode: tournament.mode, stage: 'semis', home_id: s2h, away_id: s2a, played: false, match_order: 1 })
+        } else {
+            for (let i = 0; i + 1 < quarters.length; i += 2) {
+                const wh = getWinner(quarters[i]), wa = getWinner(quarters[i + 1])
+                if (wh && wa) semiMatches.push({ tournament_id: id, mode: tournament.mode, stage: 'semis', home_id: wh, away_id: wa, played: false, match_order: i / 2 })
+            }
+        }
+        if (semiMatches.length === 0) { setGeneratingBracket(false); return }
+        await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', 'semis')
+        await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', 'final')
+        await supabase.from('matches').insert(semiMatches)
+        setGeneratingBracket(false)
+        fetchAll(id)
+    }
+
+    async function handleGenerateFinalKO() {
+        if (!tournament || !id) return
+        setGeneratingBracket(true)
+        const semis = matches
+            .filter(m => m.stage === 'semis')
+            .sort((a, b) => (a.match_order ?? 0) - (b.match_order ?? 0))
+        if (semis.length < 2) { setGeneratingBracket(false); return }
+        const getWinner = (m: Match): string | null =>
+            m.played && m.home_score !== null && m.away_score !== null
+                ? m.home_score > m.away_score ? m.home_id : m.away_id
+                : null
+        const finalHome = getWinner(semis[0]), finalAway = getWinner(semis[1])
+        if (!finalHome || !finalAway) { setGeneratingBracket(false); return }
+        await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', 'final')
+        await supabase.from('matches').insert({
+            tournament_id: id, mode: tournament.mode, stage: 'final',
+            home_id: finalHome, away_id: finalAway, played: false, match_order: 999,
+        })
+        setGeneratingBracket(false)
+        fetchAll(id)
+    }
+
     function copyCode() {
         if (!tournament) return
         navigator.clipboard.writeText(tournament.invite_code)
@@ -178,6 +277,22 @@ export default function TournamentDashboard() {
     const hasChampion = !!finalMatch && finalMatch.played &&
         finalMatch.home_score !== null && finalMatch.away_score !== null &&
         finalMatch.home_score !== finalMatch.away_score
+
+    const allGroupsPlayed = groupMatches.length > 0 && groupMatches.every(m => m.played)
+    const quartersExist = matches.some(m => m.stage === 'quarters')
+    const allQuartersPlayed = matches.filter(m => m.stage === 'quarters').length > 0 &&
+        matches.filter(m => m.stage === 'quarters').every(m => m.played)
+    const semisExist = matches.some(m => m.stage === 'semis')
+    const allSemisPlayed = matches.filter(m => m.stage === 'semis').length > 0 &&
+        matches.filter(m => m.stage === 'semis').every(m => m.played)
+
+    useEffect(() => {
+        if (hasChampion) {
+            setShowConfetti(true)
+            const t = setTimeout(() => setShowConfetti(false), 7000)
+            return () => clearTimeout(t)
+        }
+    }, [hasChampion])
 
     if (authLoading || loading) {
         return (
@@ -212,6 +327,7 @@ export default function TournamentDashboard() {
 
     return (
         <div className="min-h-screen p-6">
+            <Confetti active={showConfetti} duration={5000} />
             <div className="max-w-2xl mx-auto">
 
                 {/* Header */}
@@ -366,8 +482,72 @@ export default function TournamentDashboard() {
                                     </div>
                                 )}
 
-                                {/* Mata-mata */}
-                                {knockoutMatches.length > 0 && (
+                                {/* Bracket visual — formato grupos + mata-mata */}
+                                {tournament.format === 'groups_knockout' && (
+                                    <div className="flex flex-col gap-4">
+                                        {isAdmin && allGroupsPlayed && !quartersExist && (
+                                            <button
+                                                onClick={handleGenerateQuarters}
+                                                disabled={generatingBracket}
+                                                className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-40"
+                                                style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
+                                            >
+                                                <Trophy size={16} />
+                                                {generatingBracket ? 'Gerando...' : 'Gerar Quartas de Final'}
+                                            </button>
+                                        )}
+                                        {isAdmin && quartersExist && allQuartersPlayed && !semisExist && (
+                                            <button
+                                                onClick={handleGenerateSemis}
+                                                disabled={generatingBracket}
+                                                className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-40"
+                                                style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
+                                            >
+                                                <Trophy size={16} />
+                                                {generatingBracket ? 'Gerando...' : 'Gerar Semifinais'}
+                                            </button>
+                                        )}
+                                        {isAdmin && semisExist && allSemisPlayed && !finalMatch && (
+                                            <button
+                                                onClick={handleGenerateFinalKO}
+                                                disabled={generatingBracket}
+                                                className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-40"
+                                                style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
+                                            >
+                                                <Trophy size={16} />
+                                                {generatingBracket ? 'Gerando...' : 'Gerar Final'}
+                                            </button>
+                                        )}
+                                        {quartersExist && (
+                                            <KnockoutBracket
+                                                matches={matches.filter(m => ['quarters', 'semis', 'final'].includes(m.stage))}
+                                                players={players}
+                                                isAdmin={isAdmin}
+                                                onSelectMatch={(match) => setSelectedMatch(match)}
+                                            />
+                                        )}
+                                        {hasChampion && finalMatch && (
+                                            <div
+                                                className="px-4 py-4 rounded-xl text-center border"
+                                                style={{ borderColor: 'var(--color-gold)', backgroundColor: 'rgba(201,153,42,0.1)' }}
+                                            >
+                                                <p className="text-white/50 text-xs mb-1">🏆 Campeão do Campeonato</p>
+                                                <p className="font-bold text-xl" style={{ color: 'var(--color-gold)' }}>
+                                                    {finalMatch.home_score! > finalMatch.away_score! ? getEntityName(finalMatch.home_id) : getEntityName(finalMatch.away_id)}
+                                                </p>
+                                                <button
+                                                    onClick={() => setShowConfetti(true)}
+                                                    className="mt-2 text-xs px-3 py-1 rounded-full border border-white/20 text-white/40 hover:text-white hover:border-white/40 transition"
+                                                >
+                                                    🎊 Celebrar novamente
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Mata-mata (formato knockout direto) */}
+                                {tournament.format !== 'groups_knockout' && knockoutMatches.length > 0 && (
                                     <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
                                         <div className="px-4 py-3 border-b border-white/10" style={{ backgroundColor: 'rgba(201,153,42,0.08)' }}>
                                             <h3 className="font-bold text-sm" style={{ color: 'var(--color-gold)' }}>Mata-mata</h3>
@@ -381,7 +561,7 @@ export default function TournamentDashboard() {
                                 )}
 
                                 {/* Final */}
-                                {finalMatch && (
+                                {tournament.format !== 'groups_knockout' && finalMatch && (
                                     <div className="rounded-xl bg-white/5 border overflow-hidden" style={{ borderColor: 'var(--color-gold)' }}>
                                         <div className="px-4 py-3 border-b flex items-center gap-2"
                                             style={{ backgroundColor: 'rgba(201,153,42,0.15)', borderColor: 'var(--color-gold)' }}>
@@ -396,6 +576,12 @@ export default function TournamentDashboard() {
                                                     <p className="font-bold text-lg" style={{ color: 'var(--color-gold)' }}>
                                                         {finalMatch.home_score! > finalMatch.away_score! ? getEntityName(finalMatch.home_id) : getEntityName(finalMatch.away_id)}
                                                     </p>
+                                                    <button
+                                                        onClick={() => setShowConfetti(true)}
+                                                        className="mt-2 text-xs px-3 py-1 rounded-full border border-white/20 text-white/40 hover:text-white hover:border-white/40 transition"
+                                                    >
+                                                        🎊 Celebrar novamente
+                                                    </button>
                                                 </div>
                                             )}
                                         </div>

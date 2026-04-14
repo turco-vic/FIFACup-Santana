@@ -14,7 +14,6 @@ import PlayerProfile from './pages/PlayerProfile'
 import NotFound from './pages/NotFound'
 import ResetPassword from './pages/ResetPassword'
 import TopScorers from './pages/TopScorers'
-import Stats from './pages/Stats'
 import Supreme from './pages/Supreme'
 import CreateTournament from './pages/CreateTournament'
 import JoinTournament from './pages/JoinTournament'
@@ -43,7 +42,6 @@ function App() {
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/player/:id" element={<PlayerProfile />} />
                 <Route path="/top-scorers" element={<TopScorers />} />
-                <Route path="/stats" element={<Stats />} />
                 <Route path="/tournaments/new" element={<CreateTournament />} />
                 <Route path="/tournaments/join" element={<JoinTournament />} />
                 <Route path="/tournament/:id" element={<TournamentDashboard />} />

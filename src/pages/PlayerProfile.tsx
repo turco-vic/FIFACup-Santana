@@ -33,11 +33,11 @@ export default function PlayerProfile() {
 
       setPlayer(data)
 
-      // Busca partidas do jogador
+      // Busca partidas do jogador diretamente pelo ID
       const { data: matchesData } = await supabase
         .from('matches')
         .select('*')
-        .eq('mode', '1v1')
+        .or(`home_id.eq.${id},away_id.eq.${id}`)
         .eq('played', true)
 
       // Busca gols
@@ -46,10 +46,7 @@ export default function PlayerProfile() {
         .select('quantity')
         .eq('player_id', id)
 
-      const matches = (matchesData ?? []) as Match[]
-      const playerMatches = matches.filter(
-        m => m.home_id === id || m.away_id === id
-      )
+      const playerMatches = (matchesData ?? []) as Match[]
 
       const s: PlayerStats = {
         played: 0,
@@ -155,7 +152,7 @@ export default function PlayerProfile() {
         {/* Estatísticas */}
         {stats && stats.played > 0 && (
           <div className="flex flex-col gap-4">
-            <h2 className="text-white/40 text-xs uppercase tracking-wider">Estatísticas 1v1</h2>
+            <h2 className="text-white/40 text-xs uppercase tracking-wider">Estatísticas</h2>
 
             {/* Cards de stats */}
             <div className="grid grid-cols-3 gap-3">

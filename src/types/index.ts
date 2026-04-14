@@ -81,6 +81,8 @@ export type MatchMode = '1v1' | '2v2'
 
 export type MatchStage =
   | 'groups'
+  | 'round32'
+  | 'round16'
   | 'quarters'
   | 'semis'
   | 'final'

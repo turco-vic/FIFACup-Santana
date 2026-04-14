@@ -210,8 +210,12 @@ export default function TournamentManage() {
         await supabase.from('groups').delete().eq('tournament_id', id)
 
         const shuffled = [...playerIds].sort(() => Math.random() - 0.5)
-        const groupSize = 4
-        const numGroups = Math.ceil(shuffled.length / groupSize)
+        // numGroups must be in {4, 8, 16} so that top-2 × numGroups = 8/16/32 qualifiers (power of 2)
+        const numGroups = [4, 8, 16].find(ng => {
+            const size = Math.ceil(shuffled.length / ng)
+            return size >= 2 && size <= 5
+        }) ?? 4
+        const groupSize = Math.ceil(shuffled.length / numGroups)
 
         for (let g = 0; g < numGroups; g++) {
             const { data: group } = await supabase
