@@ -70,13 +70,12 @@ export default function Sidebar() {
                             </div>
                             <div className="min-w-0">
                                 <p className="text-white text-sm font-bold truncate">
-                                    {isSupreme ? 'AdminSupremo' : profile.name ?? 'Sem nome'}
+                                    {profile.name ?? profile.username ?? 'Sem nome'}
                                 </p>
-                                {profile.username && !isSupreme && (
+                                {isSupreme ? (
+                                    <p className="text-xs" style={{ color: 'var(--color-gold)' }}>AdminSupremo</p>
+                                ) : profile.username && (
                                     <p className="text-white/40 text-xs">@{profile.username}</p>
-                                )}
-                                {isSupreme && (
-                                    <p className="text-xs" style={{ color: 'var(--color-gold)' }}>Turco</p>
                                 )}
                             </div>
                         </div>

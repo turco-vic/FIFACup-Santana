@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { Home, Users, User, Shield } from 'lucide-react'
+import { Home, Users, User, Shield, Trophy } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
 export default function BottomNav() {
@@ -19,11 +19,13 @@ export default function BottomNav() {
     const navItems = isSupreme
         ? [
             { path: '/', label: 'Home', icon: Home },
+            { path: '/tournaments', label: 'Campeonatos', icon: Trophy },
             { path: '/players', label: 'Usuários', icon: Users },
             { path: '/admin', label: 'Supreme', icon: Shield },
         ]
         : [
             { path: '/', label: 'Home', icon: Home },
+            { path: '/tournaments', label: 'Campeonatos', icon: Trophy },
             { path: '/profile', label: 'Perfil', icon: User },
         ]
 
@@ -33,12 +35,15 @@ export default function BottomNav() {
             style={{ backgroundColor: 'rgba(5,40,30,0.97)', backdropFilter: 'blur(10px)' }}
         >
             {navItems.map(({ path, label, icon: Icon }) => {
-                const active = location.pathname === path
+                // Dentro de um campeonato (/tournament/:id) a aba Campeonatos continua ativa
+                const active = path === '/tournaments'
+                    ? location.pathname.startsWith('/tournament')
+                    : location.pathname === path
                 return (
                     <Link
                         key={path}
                         to={path}
-                        className="flex flex-col items-center gap-1 px-4 py-1 rounded-xl transition"
+                        className="flex flex-col items-center gap-1 px-3 py-1 rounded-xl transition"
                     >
                         <Icon
                             size={22}

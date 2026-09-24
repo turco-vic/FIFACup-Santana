@@ -216,7 +216,7 @@ export default function CreateTournament() {
                                 type="text"
                                 value={location}
                                 onChange={e => setLocation(e.target.value)}
-                                placeholder="Ex: Casa do Turco"
+                                placeholder="Ex: Arena Santana"
                                 className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/30 border border-white/20 focus:outline-none focus:border-yellow-500 text-sm"
                             />
                         </div>

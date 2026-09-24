@@ -90,7 +90,7 @@ export default function Supreme() {
     const active = allProfiles.filter(p => p.status === 'active' && p.role !== 'supreme')
     const blocked = allProfiles.filter(p => p.status === 'blocked')
 
-    const displayName = profile.username ?? profile.name?.split(' ')[0] ?? 'Turco'
+    const displayName = profile.username ?? profile.name?.split(' ')[0] ?? 'Supreme'
 
     return (
         <div className="min-h-screen p-6">

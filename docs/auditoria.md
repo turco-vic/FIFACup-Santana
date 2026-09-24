@@ -60,13 +60,24 @@ Ordem de aplicação:
 - [x] `FORMAT_LABEL` e `STATUS_LABEL` em `src/lib/labels.ts` (as cores de status continuam
   em cada tela).
 
-### Bloco 4.4
-- [ ] **I6** — realtime no dashboard (publicação `supabase_realtime` está vazia; precisa
-  `add table matches`).
-- [ ] **I8** — ErrorBoundary.
-- [ ] Consultas sem filtro de `tournament_id` (group_members, artilheiros).
-- [ ] "Campeonatos" no BottomNav.
-- [ ] Remover nome fixo "Turco" hardcoded.
+### Bloco 4.4 — código pronto, falta aplicar
+
+Ordem de aplicação:
+1. SQL editor: `supabase/migrations/20260924130000_fase4_bloco4_realtime.sql`
+   (rollback em `supabase/rollback/`).
+2. Deploy do front. (O front funciona sem a migration; só não atualiza sozinho.)
+
+- [x] **I6** — realtime: migration publica `matches` em `supabase_realtime`; o dashboard escuta
+  `matches` do campeonato e recarrega em silêncio (agrupando eventos em 400 ms).
+  DELETE não passa pelo filtro do realtime: um reset só aparece ao recarregar.
+- [x] **I8** — `src/components/ErrorBoundary.tsx` envolvendo o app em `main.tsx`
+  (tela "Algo deu errado" com Recarregar / Ir para o início).
+- [x] Consultas sem filtro: `group_members` do dashboard agora filtra pelos grupos do campeonato;
+  `/top-scorers` virou artilharia por campeonato (seletor com os campeonatos 1v1 do usuário,
+  supreme vê todos; `?t=<id>` na URL). A página continua sem link no menu.
+- [x] "Campeonatos" no BottomNav (jogador e supreme); fica ativo também em `/tournament/:id`.
+- [x] "Turco" fixo removido da Sidebar, Home, Supreme e placeholder do CreateTournament.
+  Mantidos de propósito: "Desenvolvido por Turco" e os links de Instagram/LinkedIn na Sidebar.
 
 ### Limpeza final
 - [ ] Apagar campeonatos de teste (AAAAAAAAAA, VVVVVVVVVV, hdgeg) e conta de teste.
@@ -74,3 +85,6 @@ Ordem de aplicação:
 - [ ] `lang="pt-BR"`, favicon.
 - [ ] Lint zerado.
 - [ ] Remover `recharts` do `package.json`.
+- [ ] Bundle JS com ~565 kB (aviso de chunk > 500 kB do Vite). Em 24/09 o build do HEAD (4.3)
+  já dava esse tamanho, antes de o 4.4 entrar; builds anteriores na mesma sessão mostraram 232 kB.
+  Investigar a causa (analisar o bundle).

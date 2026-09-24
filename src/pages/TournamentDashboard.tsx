@@ -80,18 +80,45 @@ export default function TournamentDashboard() {
         if (id) fetchAll(id)
     }, [id, authLoading, profile?.id])
 
-    async function fetchAll(tid: string) {
-        setLoading(true)
-        const [{ data: t }, { data: tp }, { data: m }, { data: d }, { data: g }, { data: gm }] = await Promise.all([
+    // I6: resultados e fases geradas por outro admin aparecem sem recarregar a página.
+    // Gerar partidas dispara um evento por linha, então as atualizações são agrupadas.
+    // (DELETE não passa pelo filtro do realtime; reset só aparece ao recarregar.)
+    useEffect(() => {
+        if (authLoading || !id) return
+        let timer: ReturnType<typeof setTimeout> | undefined
+        const channel = supabase
+            .channel(`matches:${id}`)
+            .on('postgres_changes',
+                { event: '*', schema: 'public', table: 'matches', filter: `tournament_id=eq.${id}` },
+                () => {
+                    clearTimeout(timer)
+                    timer = setTimeout(() => fetchAll(id, { silent: true }), 400)
+                })
+            .subscribe()
+        return () => {
+            clearTimeout(timer)
+            supabase.removeChannel(channel)
+        }
+    }, [id, authLoading, profile?.id])
+
+    // silent: atualiza sem trocar a tela pelo skeleton (usado pelo realtime)
+    async function fetchAll(tid: string, { silent = false } = {}) {
+        if (!silent) setLoading(true)
+        const [{ data: t }, { data: tp }, { data: m }, { data: d }, { data: g }] = await Promise.all([
             supabase.from('tournaments').select('*').eq('id', tid).single(),
             supabase.from('tournament_players').select('*, profile:player_id(*)').eq('tournament_id', tid),
             supabase.from('matches').select('*').eq('tournament_id', tid).order('match_order'),
             supabase.from('duos').select('id, duo_name, player1:player1_id(*), player2:player2_id(*)').eq('tournament_id', tid),
             supabase.from('groups').select('id, name').eq('tournament_id', tid).order('name'),
-            supabase.from('group_members').select('group_id, profile:player_id(*)'),
         ])
 
         if (!t) { navigate('/'); return }
+
+        // Só os membros dos grupos deste campeonato (antes vinha a tabela inteira)
+        const groupIds = (g ?? []).map(group => group.id)
+        const { data: gm } = groupIds.length > 0
+            ? await supabase.from('group_members').select('group_id, profile:player_id(*)').in('group_id', groupIds)
+            : { data: [] }
 
         setTournament(t)
         setMatches(m ?? [])
@@ -102,17 +129,15 @@ export default function TournamentDashboard() {
         setPlayers(playersList)
 
         // Montar grupos com jogadores
-        if (g && gm) {
-            const groupsData: GroupData[] = g.map(group => ({
-                id: group.id,
-                name: group.name,
-                players: (gm as any[])
-                    .filter(m => m.group_id === group.id)
-                    .map(m => m.profile as Profile)
-                    .filter(Boolean),
-            }))
-            setGroups(groupsData)
-        }
+        const members = (gm ?? []) as unknown as { group_id: string; profile: Profile | null }[]
+        setGroups((g ?? []).map(group => ({
+            id: group.id,
+            name: group.name,
+            players: members
+                .filter(m => m.group_id === group.id)
+                .map(m => m.profile)
+                .filter((p): p is Profile => !!p),
+        })))
 
         const me = tpList.find(tp => tp.player_id === profile?.id)
         if (me) { setMyRole(me.role); setNotMember(false) }

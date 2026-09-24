@@ -1,48 +1,82 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import type { Profile } from '../types'
+import { useAuth } from '../hooks/useAuth'
+import type { Profile, Tournament } from '../types'
 import { Trophy } from 'lucide-react'
 import { Skeleton, SkeletonCard } from '../components/Skeleton'
 
 type PlayerGoals = Profile & { total_goals: number }
+type TournamentOption = Pick<Tournament, 'id' | 'name' | 'status'>
 
+// Artilharia de um campeonato. Só o 1v1 grava gols por jogador.
 export default function TopScorers() {
+    const { profile, isSupreme } = useAuth()
+    const [searchParams, setSearchParams] = useSearchParams()
+    const [tournaments, setTournaments] = useState<TournamentOption[]>([])
     const [players, setPlayers] = useState<PlayerGoals[]>([])
     const [loading, setLoading] = useState(true)
+    const [loadingGoals, setLoadingGoals] = useState(false)
+
+    // ?t=<id> escolhe o campeonato; sem ele, o primeiro em andamento (ou o mais recente)
+    const selectedId = searchParams.get('t')
+        ?? (tournaments.find(t => t.status === 'active') ?? tournaments[0])?.id
+        ?? null
 
     useEffect(() => {
-        async function fetchGoals() {
-            const { data: goalsData } = await supabase
-                .from('goals')
-                .select('player_id, quantity')
-
-            const { data: playersData } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('role', 'player')
-
-            if (!goalsData || !playersData) {
-                setLoading(false)
-                return
+        if (!profile) return
+        async function fetchTournaments() {
+            let query = supabase
+                .from('tournaments')
+                .select('id, name, status')
+                .eq('mode', '1v1')
+                .order('created_at', { ascending: false })
+            if (!isSupreme) {
+                const { data: tp } = await supabase
+                    .from('tournament_players').select('tournament_id').eq('player_id', profile!.id)
+                const ids = (tp ?? []).map(t => t.tournament_id)
+                if (ids.length === 0) { setLoading(false); return }
+                query = query.in('id', ids)
             }
-
-            const goalMap: Record<string, number> = {}
-            goalsData.forEach(g => {
-                goalMap[g.player_id] = (goalMap[g.player_id] ?? 0) + g.quantity
-            })
-
-            const ranked = playersData
-                .map(p => ({ ...p, total_goals: goalMap[p.id] ?? 0 }))
-                .filter(p => p.total_goals > 0)
-                .sort((a, b) => b.total_goals - a.total_goals)
-
-            setPlayers(ranked)
+            const { data } = await query
+            setTournaments(data ?? [])
             setLoading(false)
         }
+        fetchTournaments()
+    }, [profile?.id, isSupreme])
 
-        fetchGoals()
-    }, [])
+    useEffect(() => {
+        if (!selectedId) { setPlayers([]); return }
+        let cancelled = false
+        async function fetchGoals(tid: string) {
+            setLoadingGoals(true)
+            const { data: matchesData } = await supabase
+                .from('matches').select('id').eq('tournament_id', tid).eq('played', true)
+            const matchIds = (matchesData ?? []).map(m => m.id)
+
+            const { data: goalsData } = matchIds.length > 0
+                ? await supabase.from('goals').select('player_id, quantity').in('match_id', matchIds)
+                : { data: [] as { player_id: string; quantity: number }[] }
+
+            const goalMap: Record<string, number> = {}
+            ;(goalsData ?? []).forEach(g => {
+                goalMap[g.player_id] = (goalMap[g.player_id] ?? 0) + g.quantity
+            })
+            const scorerIds = Object.keys(goalMap)
+
+            const { data: playersData } = scorerIds.length > 0
+                ? await supabase.from('profiles').select('*').in('id', scorerIds)
+                : { data: [] as Profile[] }
+
+            if (cancelled) return
+            setPlayers((playersData ?? [])
+                .map(p => ({ ...p, total_goals: goalMap[p.id] ?? 0 }))
+                .sort((a, b) => b.total_goals - a.total_goals))
+            setLoadingGoals(false)
+        }
+        fetchGoals(selectedId)
+        return () => { cancelled = true }
+    }, [selectedId])
 
     if (loading) {
         return (
@@ -61,13 +95,34 @@ export default function TopScorers() {
         <div className="min-h-screen p-6">
             <div className="max-w-2xl mx-auto">
 
-                <h1 className="text-2xl font-bold mb-6" style={{ color: 'var(--color-gold)' }}>
-                    Top Scorers — 1v1
+                <h1 className="text-2xl font-bold mb-4" style={{ color: 'var(--color-gold)' }}>
+                    Artilheiros — 1v1
                 </h1>
 
-                {players.length === 0 ? (
+                {tournaments.length > 0 && (
+                    <select
+                        value={selectedId ?? ''}
+                        onChange={e => setSearchParams({ t: e.target.value })}
+                        aria-label="Campeonato"
+                        className="w-full mb-6 px-4 py-3 rounded-xl bg-white/10 text-white border border-white/20 focus:outline-none focus:border-yellow-500 text-sm"
+                    >
+                        {tournaments.map(t => (
+                            <option key={t.id} value={t.id} style={{ backgroundColor: '#081f16' }}>{t.name}</option>
+                        ))}
+                    </select>
+                )}
+
+                {tournaments.length === 0 ? (
                     <p className="text-white/40 text-center mt-12">
-                        Nenhum gol registrado ainda.
+                        Você não está em nenhum campeonato 1v1.
+                    </p>
+                ) : loadingGoals ? (
+                    <div className="flex flex-col gap-2">
+                        {[...Array(4)].map((_, i) => <SkeletonCard key={i} />)}
+                    </div>
+                ) : players.length === 0 ? (
+                    <p className="text-white/40 text-center mt-12">
+                        Nenhum gol registrado neste campeonato.
                     </p>
                 ) : (
                     <div className="flex flex-col gap-2">

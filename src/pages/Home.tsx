@@ -8,9 +8,7 @@ export default function Home() {
   const navigate = useNavigate()
   const { installPrompt, isInstalled, install } = usePWA()
 
-  const displayName = isSupreme
-    ? `AdminSupremo Turco`
-    : profile?.username ?? profile?.name?.split(' ')[0] ?? ''
+  const displayName = profile?.username ?? profile?.name?.split(' ')[0] ?? ''
 
   return (
     <div className="min-h-screen p-6">
