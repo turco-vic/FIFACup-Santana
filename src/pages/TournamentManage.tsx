@@ -1,17 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, check } from '../lib/supabase'
+import { STATUS_LABEL } from '../lib/labels'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../contexts/ToastContext'
 import type { Tournament, Profile, TournamentPlayer } from '../types'
 import { ArrowLeft, Users, AlertTriangle, Shuffle, UserMinus, RefreshCw, X, Check } from 'lucide-react'
 import { Skeleton } from '../components/Skeleton'
-
-const STATUS_LABEL: Record<string, string> = {
-    setup: 'Em configuração',
-    active: 'Em andamento',
-    finished: 'Encerrado',
-}
 
 type Duo = { p1: string; p2: string }
 

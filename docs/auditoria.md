@@ -22,19 +22,15 @@ Estado da auditoria de segurança e código. Atualizar a cada bloco concluído.
   - `can_edit_tournament` trava campeonato encerrado.
   - `rename_duo` via RPC.
 
-## Verificar agora (pode não ter sido aplicado)
+## Verificado em 24/09/2026
 
-- [ ] **C8** — edge function `send-push-notification`. O deploy foi feito pela dashboard do
-  Supabase, não pelo CLI. Confirmar se o código publicado é a versão nova (valida JWT, checa
-  admin/supreme, monta title/body/url no servidor a partir de `match_id`, envia só a inscritos,
-  limpa 404/410). Se o publicado ainda lê `{title, body, url}`, o push está quebrado (título
-  `undefined`) e o C8 continua aberto.
-  - Até 24/09/2026 o repositório tinha a versão antiga. A versão nova agora está em
-    `supabase/functions/send-push-notification/index.ts` e depende da migration do Bloco 4.2.
-  - O CLI local está logado numa conta sem acesso ao projeto (403): verificar pela dashboard.
-- [ ] Confirmar que as 2 migrations (fase3 e fase4_bloco1) estão aplicadas no banco remoto.
+- [x] **C8** — edge function `send-push-notification` nova publicada pela dashboard (valida JWT,
+  checa `can_edit_tournament`, monta o texto a partir de `match_id`, envia só aos participantes,
+  limpa 404/410). Código em `supabase/functions/send-push-notification/index.ts`.
+  O CLI local está logado numa conta sem acesso ao projeto (403): verificações remotas pela dashboard.
+- [x] Migrations fase3 e fase4_bloco1 aplicadas no banco remoto.
 
-## Bloco 4.2 — código pronto, falta aplicar
+## Bloco 4.2 — aplicado (migration, edge function e front no ar em 24/09/2026)
 
 Ordem de aplicação:
 1. SQL editor: `supabase/migrations/20260924120000_fase4_bloco2_resultados.sql`
@@ -55,11 +51,14 @@ Ordem de aplicação:
 
 ## Falta fazer
 
-### Bloco 4.3
-- [ ] Unificar classificação em `src/lib/standings.ts` (hoje implementada ~6 vezes, incluindo
-  `useStandingsInline` com erro de rules-of-hooks).
+### Bloco 4.3 — código pronto (só front)
+- [x] Classificação unificada em `src/lib/standings.ts` (`computeStandings`, `compareStandings`,
+  `tiedOnAllCriteria`). Substituiu `hooks/useStandings.ts` (removido), `useStandingsInline`
+  (erro de rules-of-hooks), `getGroupStandingsForBracket`, a aba Stats e o `PlayerProfile`.
+  Conferido contra a implementação antiga: mesmo resultado em 2000 tabelas aleatórias.
 - [x] `getWinner` unificado em `src/lib/matches.ts` (feito no 4.2, por causa dos pênaltis).
-- [ ] `FORMAT_LABEL` (3x) num lugar só.
+- [x] `FORMAT_LABEL` e `STATUS_LABEL` em `src/lib/labels.ts` (as cores de status continuam
+  em cada tela).
 
 ### Bloco 4.4
 - [ ] **I6** — realtime no dashboard (publicação `supabase_realtime` está vazia; precisa

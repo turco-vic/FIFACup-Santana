@@ -2,17 +2,11 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { formatDate } from '../lib/format'
+import { FORMAT_LABEL } from '../lib/labels'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../contexts/ToastContext'
 import { ArrowLeft, Hash, Swords, Handshake } from 'lucide-react'
 import type { Tournament } from '../types'
-
-const FORMAT_LABEL: Record<string, string> = {
-    groups_knockout: 'Grupos + Mata-mata',
-    league: 'Liga',
-    knockout: 'Mata-mata',
-    league_final: 'Liga + Final',
-}
 
 export default function JoinTournament() {
     const { profile } = useAuth()

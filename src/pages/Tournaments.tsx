@@ -2,22 +2,16 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { formatDate } from '../lib/format'
+import { FORMAT_LABEL, STATUS_LABEL } from '../lib/labels'
 import { useAuth } from '../hooks/useAuth'
 import type { Tournament } from '../types'
 import { Skeleton, SkeletonCard } from '../components/Skeleton'
 import { Trophy, Swords, Handshake, Calendar, Plus, Hash } from 'lucide-react'
 
-const FORMAT_LABEL: Record<string, string> = {
-    groups_knockout: 'Grupos + Mata-mata',
-    league: 'Liga',
-    knockout: 'Mata-mata',
-    league_final: 'Liga + Final',
-}
-
-const STATUS_LABEL: Record<string, { label: string; color: string }> = {
-    setup: { label: 'Em configuração', color: 'text-white/40' },
-    active: { label: 'Em andamento', color: 'text-green-400' },
-    finished: { label: 'Encerrado', color: 'text-white/30' },
+const STATUS_COLOR: Record<string, string> = {
+    setup: 'text-white/40',
+    active: 'text-green-400',
+    finished: 'text-white/30',
 }
 
 export default function Tournaments() {
@@ -156,7 +150,6 @@ export default function Tournaments() {
 }
 
 function TournamentCard({ tournament: t, onClick }: { tournament: Tournament; onClick: () => void }) {
-    const status = STATUS_LABEL[t.status] ?? { label: t.status, color: 'text-white/40' }
 
     return (
         <button
@@ -182,7 +175,7 @@ function TournamentCard({ tournament: t, onClick }: { tournament: Tournament; on
                 )}
             </div>
             <div className="flex-shrink-0 text-right">
-                <span className={`text-xs font-medium ${status.color}`}>{status.label}</span>
+                <span className={`text-xs font-medium ${STATUS_COLOR[t.status] ?? 'text-white/40'}`}>{STATUS_LABEL[t.status] ?? t.status}</span>
                 <p className="text-white/20 text-xs mt-0.5 font-mono">{t.invite_code}</p>
             </div>
         </button>

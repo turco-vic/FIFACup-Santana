@@ -1,20 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import type { Profile, Match } from '../types'
+import { computeStandings } from '../lib/standings'
+import type { Profile, Match, Standing } from '../types'
 import { ArrowLeft, Trophy, Swords, Shield } from 'lucide-react'
 import { Skeleton } from '../components/Skeleton'
 
-type PlayerStats = {
-  played: number
-  wins: number
-  draws: number
-  losses: number
-  goals_for: number
-  goals_against: number
-  points: number
-  total_goals: number
-}
+type PlayerStats = Standing & { total_goals: number }
 
 export default function PlayerProfile() {
   const { id } = useParams()
@@ -48,32 +40,8 @@ export default function PlayerProfile() {
 
       const playerMatches = (matchesData ?? []) as Match[]
 
-      const s: PlayerStats = {
-        played: 0,
-        wins: 0,
-        draws: 0,
-        losses: 0,
-        goals_for: 0,
-        goals_against: 0,
-        points: 0,
-        total_goals: (goalsData ?? []).reduce((a, g) => a + g.quantity, 0),
-      }
-
-      playerMatches.forEach(m => {
-        const isHome = m.home_id === id
-        const myScore = isHome ? (m.home_score ?? 0) : (m.away_score ?? 0)
-        const oppScore = isHome ? (m.away_score ?? 0) : (m.home_score ?? 0)
-
-        s.played++
-        s.goals_for += myScore
-        s.goals_against += oppScore
-
-        if (myScore > oppScore) { s.wins++; s.points += 3 }
-        else if (myScore === oppScore) { s.draws++; s.points++ }
-        else s.losses++
-      })
-
-      setStats(s)
+      const [s] = computeStandings([{ id: id!, name: '' }], playerMatches)
+      setStats({ ...s, total_goals: (goalsData ?? []).reduce((a, g) => a + g.quantity, 0) })
       setLoading(false)
     }
 

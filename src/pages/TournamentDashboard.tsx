@@ -5,7 +5,8 @@ import { getWinner, penaltiesLabel } from '../lib/matches'
 import { formatDate } from '../lib/format'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../contexts/ToastContext'
-import { useStandings } from '../hooks/useStandings'
+import { computeStandings, profileEntity, tiedOnAllCriteria, type Entity } from '../lib/standings'
+import { FORMAT_LABEL, STATUS_LABEL } from '../lib/labels'
 import GroupTable from '../components/GroupTable'
 import type { Tournament, Profile, Match, TournamentPlayer } from '../types'
 import {
@@ -16,13 +17,6 @@ import { Skeleton } from '../components/Skeleton'
 import ScoreModal from '../components/ScoreModal'
 import Confetti from '../components/Confetti'
 import KnockoutBracket from '../components/KnockoutBracket'
-
-const FORMAT_LABEL: Record<string, string> = {
-    groups_knockout: 'Grupos + Mata-mata',
-    league: 'Liga',
-    knockout: 'Mata-mata',
-    league_final: 'Liga + Final',
-}
 
 const STAGE_LABEL: Record<string, string> = {
     groups: 'Grupos', round32: '16avos', round16: 'Oitavas',
@@ -38,10 +32,10 @@ const FIRST_KO_STAGE: Record<number, { stage: string; label: string }> = {
     16: { stage: 'round32', label: '16avos de Final' },
 }
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-    setup: { label: 'Em configuração', color: 'text-white/50', bg: 'bg-white/10' },
-    active: { label: 'Em andamento', color: 'text-green-400', bg: 'bg-green-500/15' },
-    finished: { label: 'Encerrado', color: 'text-white/30', bg: 'bg-white/5' },
+const STATUS_STYLE: Record<string, { color: string; bg: string }> = {
+    setup: { color: 'text-white/50', bg: 'bg-white/10' },
+    active: { color: 'text-green-400', bg: 'bg-green-500/15' },
+    finished: { color: 'text-white/30', bg: 'bg-white/5' },
 }
 
 type Tab = 'partidas' | 'jogadores' | 'estatisticas'
@@ -140,12 +134,18 @@ export default function TournamentDashboard() {
         return player?.username ?? player?.name ?? 'Desconhecido'
     }
 
-    const duosAsProfiles: Profile[] = duos.map(d => ({
-        id: d.id,
-        name: getEntityName(d.id),
-        username: null, avatar_url: null, team_name: null,
-        role: 'player' as const, status: 'active' as const, created_at: '',
-    }))
+    // Quem disputa: duplas no 2v2, jogadores no 1v1
+    const entities: Entity[] = tournament?.mode === '2v2'
+        ? duos.map(d => ({ id: d.id, name: getEntityName(d.id) }))
+        : players.map(profileEntity)
+
+    function groupMatchesOf(group: GroupData): Match[] {
+        return matches.filter(m =>
+            m.stage === 'groups' &&
+            group.players.some(p => p.id === m.home_id) &&
+            group.players.some(p => p.id === m.away_id)
+        )
+    }
 
     async function handleGenerateFinal() {
         if (!tournament || !id) return
@@ -180,28 +180,6 @@ export default function TournamentDashboard() {
         return winners
     }
 
-    function getGroupStandingsForBracket(group: GroupData) {
-        const gMatches = matches.filter(m =>
-            m.stage === 'groups' &&
-            group.players.some(p => p.id === m.home_id) &&
-            group.players.some(p => p.id === m.away_id)
-        )
-        const standings: Record<string, { id: string; points: number; gd: number; gf: number }> = {}
-        group.players.forEach(p => { standings[p.id] = { id: p.id, points: 0, gd: 0, gf: 0 } })
-        gMatches.filter(m => m.played).forEach(m => {
-            const hs = m.home_score ?? 0
-            const as_ = m.away_score ?? 0
-            standings[m.home_id].gf += hs; standings[m.home_id].gd += hs - as_
-            standings[m.away_id].gf += as_; standings[m.away_id].gd += as_ - hs
-            if (hs > as_) standings[m.home_id].points += 3
-            else if (as_ > hs) standings[m.away_id].points += 3
-            else { standings[m.home_id].points += 1; standings[m.away_id].points += 1 }
-        })
-        return Object.values(standings).sort(
-            (a, b) => b.points - a.points || b.gd - a.gd || b.gf - a.gf
-        )
-    }
-
     async function handleGenerateFirstKORound() {
         if (!tournament || !id || groups.length === 0) return
         const n = groups.length
@@ -211,7 +189,7 @@ export default function TournamentDashboard() {
             return
         }
         setGeneratingBracket(true)
-        const groupStandings = groups.map(g => getGroupStandingsForBracket(g))
+        const groupStandings = groups.map(g => computeStandings(g.players.map(profileEntity), groupMatchesOf(g)))
         const koMatches: any[] = []
         for (let i = 0; i + 1 < n; i += 2) {
             koMatches.push({
@@ -342,13 +320,9 @@ export default function TournamentDashboard() {
     const knockoutMatches = matches.filter(m => ['quarters', 'semis', 'knockout'].includes(m.stage))
     const groupMatches = matches.filter(m => m.stage === 'groups')
     const allLeaguePlayed = leagueMatches.length > 0 && leagueMatches.every(m => m.played)
-    const standingsProfiles = tournament?.mode === '2v2' ? duosAsProfiles : players
-    const leagueStandings = useStandings(standingsProfiles, leagueMatches)
+    const leagueStandings = computeStandings(entities, leagueMatches)
     // Liga pura: campeão é o líder quando todos os jogos acabaram, se não empatar em todos os critérios
-    const leagueTiedAtTop = leagueStandings.length > 1 &&
-        leagueStandings[0].points === leagueStandings[1].points &&
-        leagueStandings[0].goal_diff === leagueStandings[1].goal_diff &&
-        leagueStandings[0].goals_for === leagueStandings[1].goals_for
+    const leagueTiedAtTop = leagueStandings.length > 1 && tiedOnAllCriteria(leagueStandings[0], leagueStandings[1])
     const leagueChampionId = tournament?.format === 'league' && allLeaguePlayed && !leagueTiedAtTop
         ? leagueStandings[0]?.id ?? null
         : null
@@ -409,7 +383,7 @@ export default function TournamentDashboard() {
         )
     }
 
-    const statusCfg = STATUS_CONFIG[tournament.status]
+    const statusStyle = STATUS_STYLE[tournament.status]
 
     return (
         <div className="min-h-screen p-6">
@@ -429,8 +403,8 @@ export default function TournamentDashboard() {
                                 {tournament.mode}
                             </span>
                             <span className="text-white/30 text-xs">{FORMAT_LABEL[tournament.format]}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded font-bold ${statusCfg.color} ${statusCfg.bg}`}>
-                                {statusCfg.label}
+                            <span className={`text-xs px-2 py-0.5 rounded font-bold ${statusStyle.color} ${statusStyle.bg}`}>
+                                {STATUS_LABEL[tournament.status]}
                             </span>
                         </div>
                     </div>
@@ -541,11 +515,8 @@ export default function TournamentDashboard() {
                                 {groupMatches.length > 0 && (
                                     <div className="flex flex-col gap-6">
                                         {groups.length > 0 ? groups.map(group => {
-                                            const gMatches = groupMatches.filter(m =>
-                                                group.players.some(p => p.id === m.home_id) &&
-                                                group.players.some(p => p.id === m.away_id)
-                                            )
-                                            const gStandings = useStandingsInline(group.players, gMatches)
+                                            const gMatches = groupMatchesOf(group)
+                                            const gStandings = computeStandings(group.players.map(profileEntity), gMatches)
                                             return (
                                                 <div key={group.id} className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
                                                     <div className="px-4 py-3 border-b border-white/10" style={{ backgroundColor: 'rgba(201,153,42,0.08)' }}>
@@ -689,29 +660,16 @@ export default function TournamentDashboard() {
                 {/* Tab: Estatísticas */}
                 {tab === 'estatisticas' && (() => {
                     const allPlayed = matches.filter(m => m.played && m.home_score !== null && m.away_score !== null)
-                    const entityIds = tournament.mode === '2v2' ? duos.map(d => d.id) : players.map(p => p.id)
-                    const stats = entityIds.map(eid => {
-                        const myM = allPlayed.filter(m => m.home_id === eid || m.away_id === eid)
-                        const wins = myM.filter(m =>
-                            (m.home_id === eid && m.home_score! > m.away_score!) ||
-                            (m.away_id === eid && m.away_score! > m.home_score!)
-                        ).length
-                        const draws = myM.filter(m => m.home_score === m.away_score).length
-                        const losses = myM.length - wins - draws
-                        const gf = myM.reduce((a, m) => a + (m.home_id === eid ? m.home_score! : m.away_score!), 0)
-                        const ga = myM.reduce((a, m) => a + (m.home_id === eid ? m.away_score! : m.home_score!), 0)
-                        return {
-                            id: eid, name: getEntityName(eid),
-                            played: myM.length, wins, draws, losses, gf, ga,
-                            gd: gf - ga,
-                            winRate: myM.length > 0 ? Math.round(wins / myM.length * 100) : 0,
-                        }
-                    })
+                    // Todas as fases juntas; pênaltis contam como empate
+                    const stats = computeStandings(entities, allPlayed).map(s => ({
+                        ...s,
+                        winRate: s.played > 0 ? Math.round(s.wins / s.played * 100) : 0,
+                    }))
                     const totalGoals = allPlayed.reduce((a, m) => a + (m.home_score ?? 0) + (m.away_score ?? 0), 0)
                     const gpj = allPlayed.length > 0 ? (totalGoals / allPlayed.length).toFixed(1) : '0.0'
-                    const topScorers = [...stats].sort((a, b) => b.gf - a.gf || b.gd - a.gd)
+                    const topScorers = [...stats].sort((a, b) => b.goals_for - a.goals_for || b.goal_diff - a.goal_diff)
                     const topWinRate = [...stats].filter(s => s.played >= 1).sort((a, b) => b.winRate - a.winRate || b.wins - a.wins)
-                    const bestDef = [...stats].filter(s => s.played >= 1).sort((a, b) => a.ga - b.ga || b.played - a.played)
+                    const bestDef = [...stats].filter(s => s.played >= 1).sort((a, b) => a.goals_against - b.goals_against || b.played - a.played)
                     return (
                         <div className="flex flex-col gap-4">
                             {/* Resumo geral */}
@@ -738,7 +696,7 @@ export default function TournamentDashboard() {
                                         <div key={s.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-white/5 last:border-0">
                                             <span className="text-white/30 text-xs w-5 text-center font-bold">{i + 1}</span>
                                             <span className="flex-1 text-white text-sm truncate">{s.name}</span>
-                                            <span className="font-bold text-sm" style={{ color: 'var(--color-gold)' }}>{s.gf} gols</span>
+                                            <span className="font-bold text-sm" style={{ color: 'var(--color-gold)' }}>{s.goals_for} gols</span>
                                         </div>
                                     ))}
                                 </div>
@@ -776,7 +734,7 @@ export default function TournamentDashboard() {
                                         <div key={s.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-white/5 last:border-0">
                                             <span className="text-white/30 text-xs w-5 text-center font-bold">{i + 1}</span>
                                             <span className="flex-1 text-white text-sm truncate">{s.name}</span>
-                                            <span className="font-bold text-sm text-blue-400">{s.ga} sofridos</span>
+                                            <span className="font-bold text-sm text-blue-400">{s.goals_against} sofridos</span>
                                         </div>
                                     ))}
                                 </div>
@@ -873,44 +831,6 @@ export default function TournamentDashboard() {
             )}
         </div>
     )
-}
-
-// Hook inline para standings de grupo (não pode usar hooks condicionalmente)
-function useStandingsInline(players: Profile[], matches: Match[]) {
-    return players.map(p => {
-        const pts = matches.filter(m => m.played).reduce((acc, m) => {
-            if (m.home_id === p.id) {
-                if ((m.home_score ?? 0) > (m.away_score ?? 0)) return acc + 3
-                if ((m.home_score ?? 0) === (m.away_score ?? 0)) return acc + 1
-            }
-            if (m.away_id === p.id) {
-                if ((m.away_score ?? 0) > (m.home_score ?? 0)) return acc + 3
-                if ((m.home_score ?? 0) === (m.away_score ?? 0)) return acc + 1
-            }
-            return acc
-        }, 0)
-        const gf = matches.filter(m => m.played).reduce((acc, m) => {
-            if (m.home_id === p.id) return acc + (m.home_score ?? 0)
-            if (m.away_id === p.id) return acc + (m.away_score ?? 0)
-            return acc
-        }, 0)
-        const ga = matches.filter(m => m.played).reduce((acc, m) => {
-            if (m.home_id === p.id) return acc + (m.away_score ?? 0)
-            if (m.away_id === p.id) return acc + (m.home_score ?? 0)
-            return acc
-        }, 0)
-        const wins = matches.filter(m => m.played && ((m.home_id === p.id && (m.home_score ?? 0) > (m.away_score ?? 0)) || (m.away_id === p.id && (m.away_score ?? 0) > (m.home_score ?? 0)))).length
-        const draws = matches.filter(m => m.played && (m.home_id === p.id || m.away_id === p.id) && m.home_score === m.away_score).length
-        const losses = matches.filter(m => m.played && ((m.home_id === p.id && (m.home_score ?? 0) < (m.away_score ?? 0)) || (m.away_id === p.id && (m.away_score ?? 0) < (m.home_score ?? 0)))).length
-        const played = matches.filter(m => m.played && (m.home_id === p.id || m.away_id === p.id)).length
-        return {
-            id: p.id,
-            name: p.username ?? p.name ?? 'Sem nome',
-            played, wins, draws, losses,
-            goals_for: gf, goals_against: ga,
-            goal_diff: gf - ga, points: pts,
-        }
-    }).sort((a, b) => b.points - a.points || b.goal_diff - a.goal_diff || b.goals_for - a.goals_for)
 }
 
 function MatchRow({ match, getEntityName, isAdmin, onEdit }: {
