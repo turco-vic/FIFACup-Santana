@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, check } from '../lib/supabase'
 import { STATUS_LABEL } from '../lib/labels'
+import { shuffle } from '../lib/shuffle'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../contexts/ToastContext'
 import type { Tournament, Profile, TournamentPlayer } from '../types'
@@ -123,7 +124,7 @@ export default function TournamentManage() {
 
     function handleShuffleDuos() {
         const allPlayerIds = players.map(p => p.player_id)
-        const shuffled = [...allPlayerIds].sort(() => Math.random() - 0.5)
+        const shuffled = shuffle(allPlayerIds)
         const newDuos: Duo[] = []
         for (let i = 0; i < shuffled.length - 1; i += 2) {
             newDuos.push({ p1: shuffled[i], p2: shuffled[i + 1] })
@@ -279,7 +280,7 @@ export default function TournamentManage() {
         }
         check(await supabase.from('groups').delete().eq('tournament_id', id))
 
-        const shuffled = [...playerIds].sort(() => Math.random() - 0.5)
+        const shuffled = shuffle(playerIds)
         const numGroups = planGroups(shuffled.length)
         if (numGroups === null) return
         // Distribuição round-robin: tamanhos diferem no máximo em 1, nunca há grupo vazio

@@ -88,7 +88,9 @@ Levantamento: comparação dos arquivos removidos na Fase 1 (`10db328^`) com o s
   vai ser apagado, um modal lista o que sai (com placar) e o que entra. Substituiu os 5 geradores
   do dashboard. Classificação agora desempata empate total por nome/id (ordem estável).
   Regerar os grupos (novo sorteio) continua em Gerenciar → Gerar / Regerar Partidas.
-- [ ] 2. Fisher-Yates no sorteio de grupos e duplas.
+- [x] 2. Fisher-Yates (`src/lib/shuffle.ts`) no sorteio de grupos e duplas (TournamentManage).
+  Medido em 200 mil sorteios com 8 jogadores: com `sort(random)`, a chance de um jogador sair
+  em 1º variava de 8,2% a 22,1% (justo: 12,5%); com Fisher-Yates, 12,4–12,6%.
 - [ ] 3. Estatísticas da dupla no DuoModal + link dos jogadores para `/player/:id`.
 - [ ] 4. Revisão dos grupos antes de salvar.
 
