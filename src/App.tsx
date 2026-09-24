@@ -6,9 +6,6 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Home from './pages/Home'
 import Players from './pages/Players'
-import Draw from './pages/Draw'
-import Bracket1v1 from './pages/Bracket1v1'
-import League2v2 from './pages/League2v2'
 import Profile from './pages/Profile'
 import PlayerProfile from './pages/PlayerProfile'
 import NotFound from './pages/NotFound'
@@ -37,8 +34,6 @@ function App() {
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/players" element={<Players />} />
-                <Route path="/1v1" element={<Bracket1v1 />} />
-                <Route path="/2v2" element={<League2v2 />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/player/:id" element={<PlayerProfile />} />
                 <Route path="/top-scorers" element={<TopScorers />} />
@@ -48,11 +43,6 @@ function App() {
                 <Route path="/tournament/:id/manage" element={<TournamentManage />} />
                 <Route path="/tournaments" element={<Tournaments />} />
 
-                <Route path="/draw" element={
-                  <ProtectedRoute supremeOnly>
-                    <Draw />
-                  </ProtectedRoute>
-                } />
                 <Route path="/admin" element={
                   <ProtectedRoute supremeOnly>
                     <Supreme />

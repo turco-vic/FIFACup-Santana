@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { useToast } from '../contexts/ToastContext'
 import type { Profile } from '../types'
 import {
-    Users, LogOut, Pencil, AlertTriangle,
+    Users, LogOut, Pencil,
     CheckCircle, XCircle, Clock, Shield, ChevronDown, ChevronUp
 } from 'lucide-react'
 import { Skeleton } from '../components/Skeleton'
@@ -288,36 +288,6 @@ export default function Supreme() {
                         </div>
                     </div>
                 )}
-
-                {/* Zona de Perigo */}
-                <div className="rounded-xl overflow-hidden mb-6" style={{ border: '1px solid rgba(239,68,68,0.4)' }}>
-                    <div
-                        className="px-4 py-3 border-b flex items-center gap-2"
-                        style={{ backgroundColor: '#1a0a0a', borderColor: 'rgba(239,68,68,0.4)' }}
-                    >
-                        <AlertTriangle size={14} className="text-red-400" />
-                        <h2 className="font-bold text-sm text-red-400">Zona de Perigo</h2>
-                    </div>
-                    <div className="px-4 py-5" style={{ backgroundColor: '#0d0d0d' }}>
-                        <p className="text-white/40 text-sm mb-4">
-                            Ações irreversíveis do sistema. Use com cautela.
-                        </p>
-                        <button
-                            onClick={() => navigate('/draw')}
-                            className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition mb-3"
-                            style={{
-                                border: '1px solid rgba(239,68,68,0.5)',
-                                color: 'rgb(248,113,113)',
-                                backgroundColor: 'rgba(239,68,68,0.1)',
-                            }}
-                            onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.2)')}
-                            onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.1)')}
-                        >
-                            <AlertTriangle size={15} />
-                            Gerenciar Sorteio / Reset
-                        </button>
-                    </div>
-                </div>
 
             </div>
 
