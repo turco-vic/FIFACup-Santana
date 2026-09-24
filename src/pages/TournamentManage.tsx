@@ -102,10 +102,15 @@ export default function TournamentManage() {
     async function handleSetStatus(status: Tournament['status']) {
         if (!id) return
         setWorking(true)
-        await supabase.from('tournaments').update({ status }).eq('id', id)
+        // .select() revela quando o RLS bloqueia (update sem erro, mas 0 linhas)
+        const { data, error } = await supabase.from('tournaments').update({ status }).eq('id', id).select('id')
+        setWorking(false)
+        if (error || !data || data.length === 0) {
+            showToast('Não foi possível alterar o status.')
+            return
+        }
         setTournament(prev => prev ? { ...prev, status } : null)
         showToast(`Status: ${STATUS_LABEL[status]}`)
-        setWorking(false)
     }
 
     // ---- DUPLAS ----
@@ -344,6 +349,8 @@ export default function TournamentManage() {
     if (!tournament) return null
 
     const is2v2 = tournament.mode === '2v2'
+    // Mesma regra do can_edit_tournament no banco: encerrado só o supreme edita
+    const locked = tournament.status === 'finished' && !isSupreme
     const allPlayerIds = players.map(p => p.player_id)
     const availableForSelection = allPlayerIds.filter(pid => {
         if (!selectingFor) return false
@@ -396,6 +403,12 @@ export default function TournamentManage() {
                     </div>
                 </div>
 
+                {locked && (
+                    <div className="mb-6 px-4 py-3 rounded-xl text-sm text-yellow-400 bg-yellow-400/10 border border-yellow-400/20">
+                        🔒 Campeonato encerrado. Para editar jogadores, duplas ou partidas, volte o status para "Em andamento".
+                    </div>
+                )}
+
                 {/* Jogadores */}
                 <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden mb-6">
                     <div className="px-4 py-3 border-b border-white/10" style={{ backgroundColor: 'rgba(201,153,42,0.08)' }}>
@@ -425,10 +438,12 @@ export default function TournamentManage() {
                                         <p className="text-white text-sm font-medium truncate">{tp.profile?.name}</p>
                                         {tp.profile?.username && <p className="text-white/40 text-xs">@{tp.profile.username}</p>}
                                     </div>
-                                    <button onClick={() => handleRemovePlayer(tp.player_id)}
-                                        className="p-1.5 rounded border border-red-500/20 text-red-400/50 hover:text-red-400 hover:border-red-500/50 transition flex-shrink-0">
-                                        <UserMinus size={13} />
-                                    </button>
+                                    {!locked && (
+                                        <button onClick={() => handleRemovePlayer(tp.player_id)}
+                                            className="p-1.5 rounded border border-red-500/20 text-red-400/50 hover:text-red-400 hover:border-red-500/50 transition flex-shrink-0">
+                                            <UserMinus size={13} />
+                                        </button>
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -436,7 +451,7 @@ export default function TournamentManage() {
                 </div>
 
                 {/* Duplas — só para 2v2 */}
-                {is2v2 && (
+                {is2v2 && !locked && (
                     <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden mb-6">
                         <div className="px-4 py-3 border-b border-white/10" style={{ backgroundColor: 'rgba(201,153,42,0.08)' }}>
                             <div className="flex items-center justify-between">
@@ -547,6 +562,7 @@ export default function TournamentManage() {
                     </div>
                 )}
 
+                {!locked && (<>
                 {/* Gerar partidas */}
                 <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden mb-6">
                     <div className="px-4 py-3 border-b border-white/10" style={{ backgroundColor: 'rgba(201,153,42,0.08)' }}>
@@ -630,6 +646,7 @@ export default function TournamentManage() {
                         )}
                     </div>
                 </div>
+                </>)}
 
             </div>
         </div>

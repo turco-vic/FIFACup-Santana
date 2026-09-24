@@ -189,6 +189,10 @@ export default function JoinTournament() {
                                         Ver campeonato
                                     </button>
                                 </div>
+                            ) : found.status === 'finished' ? (
+                                <p className="mt-3 text-white/40 text-sm text-center">
+                                    Este campeonato já foi encerrado e não aceita novos jogadores.
+                                </p>
                             ) : (
                                 <button
                                     onClick={handleJoin}

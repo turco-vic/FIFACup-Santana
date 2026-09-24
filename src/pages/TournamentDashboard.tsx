@@ -325,6 +325,8 @@ export default function TournamentDashboard() {
     }
 
     const isAdmin = isSupreme || myRole === 'admin'
+    // Mesma regra do can_edit_tournament no banco: encerrado trava o admin (supreme pode tudo)
+    const canEdit = isSupreme || (myRole === 'admin' && tournament?.status !== 'finished')
     const leagueMatches = matches.filter(m => m.stage === 'league')
     const finalMatch = matches.find(m => m.stage === 'final')
     const knockoutMatches = matches.filter(m => ['quarters', 'semis', 'knockout'].includes(m.stage))
@@ -494,11 +496,11 @@ export default function TournamentDashboard() {
                                             </div>
                                             <div className="px-4 py-3 flex flex-col">
                                                 {leagueMatches.map(match => (
-                                                    <MatchRow key={match.id} match={match} getEntityName={getEntityName} isAdmin={isAdmin} onEdit={() => setSelectedMatch(match)} />
+                                                    <MatchRow key={match.id} match={match} getEntityName={getEntityName} isAdmin={canEdit} onEdit={() => setSelectedMatch(match)} />
                                                 ))}
                                             </div>
                                         </div>
-                                        {isAdmin && allLeaguePlayed && !finalMatch && tournament.format === 'league_final' && (
+                                        {canEdit && allLeaguePlayed && !finalMatch && tournament.format === 'league_final' && (
                                             <button onClick={handleGenerateFinal} disabled={generatingFinal}
                                                 className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition hover:opacity-90"
                                                 style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}>
@@ -528,7 +530,7 @@ export default function TournamentDashboard() {
                                                     </div>
                                                     <div className="px-4 py-3 flex flex-col">
                                                         {gMatches.map(match => (
-                                                            <MatchRow key={match.id} match={match} getEntityName={getEntityName} isAdmin={isAdmin} onEdit={() => setSelectedMatch(match)} />
+                                                            <MatchRow key={match.id} match={match} getEntityName={getEntityName} isAdmin={canEdit} onEdit={() => setSelectedMatch(match)} />
                                                         ))}
                                                     </div>
                                                 </div>
@@ -541,7 +543,7 @@ export default function TournamentDashboard() {
                                                 </div>
                                                 <div className="px-4 py-3 flex flex-col">
                                                     {groupMatches.map(match => (
-                                                        <MatchRow key={match.id} match={match} getEntityName={getEntityName} isAdmin={isAdmin} onEdit={() => setSelectedMatch(match)} />
+                                                        <MatchRow key={match.id} match={match} getEntityName={getEntityName} isAdmin={canEdit} onEdit={() => setSelectedMatch(match)} />
                                                     ))}
                                                 </div>
                                             </div>
@@ -552,7 +554,7 @@ export default function TournamentDashboard() {
                                 {/* Bracket visual — formato grupos + mata-mata */}
                                 {tournament.format === 'groups_knockout' && (
                                     <div className="flex flex-col gap-4">
-                                        {isAdmin && allGroupsPlayed && !anyKOExists && (
+                                        {canEdit && allGroupsPlayed && !anyKOExists && (
                                             <button
                                                 onClick={handleGenerateFirstKORound}
                                                 disabled={generatingBracket}
@@ -563,7 +565,7 @@ export default function TournamentDashboard() {
                                                 {generatingBracket ? 'Gerando...' : `Gerar ${firstKOLabel}`}
                                             </button>
                                         )}
-                                        {isAdmin && round32Exist && allRound32Played && !round16Exist && (
+                                        {canEdit && round32Exist && allRound32Played && !round16Exist && (
                                             <button
                                                 onClick={() => handleAdvanceRound('round32', 'round16')}
                                                 disabled={generatingBracket}
@@ -574,7 +576,7 @@ export default function TournamentDashboard() {
                                                 {generatingBracket ? 'Gerando...' : 'Gerar Oitavas de Final'}
                                             </button>
                                         )}
-                                        {isAdmin && round16Exist && allRound16Played && !quartersExist && (
+                                        {canEdit && round16Exist && allRound16Played && !quartersExist && (
                                             <button
                                                 onClick={() => handleAdvanceRound('round16', 'quarters')}
                                                 disabled={generatingBracket}
@@ -585,7 +587,7 @@ export default function TournamentDashboard() {
                                                 {generatingBracket ? 'Gerando...' : 'Gerar Quartas de Final'}
                                             </button>
                                         )}
-                                        {isAdmin && quartersExist && allQuartersPlayed && !semisExist && (
+                                        {canEdit && quartersExist && allQuartersPlayed && !semisExist && (
                                             <button
                                                 onClick={handleGenerateSemis}
                                                 disabled={generatingBracket}
@@ -596,7 +598,7 @@ export default function TournamentDashboard() {
                                                 {generatingBracket ? 'Gerando...' : 'Gerar Semifinais'}
                                             </button>
                                         )}
-                                        {isAdmin && semisExist && allSemisPlayed && !finalMatch && (
+                                        {canEdit && semisExist && allSemisPlayed && !finalMatch && (
                                             <button
                                                 onClick={handleGenerateFinalKO}
                                                 disabled={generatingBracket}
@@ -611,7 +613,7 @@ export default function TournamentDashboard() {
                                             <KnockoutBracket
                                                 matches={matches.filter(m => ['round32', 'round16', 'quarters', 'semis', 'final'].includes(m.stage))}
                                                 players={players}
-                                                isAdmin={isAdmin}
+                                                isAdmin={canEdit}
                                                 onSelectMatch={(match) => setSelectedMatch(match)}
                                             />
                                         )}
@@ -643,7 +645,7 @@ export default function TournamentDashboard() {
                                         </div>
                                         <div className="px-4 py-3 flex flex-col">
                                             {knockoutMatches.map(match => (
-                                                <MatchRow key={match.id} match={match} getEntityName={getEntityName} isAdmin={isAdmin} onEdit={() => setSelectedMatch(match)} />
+                                                <MatchRow key={match.id} match={match} getEntityName={getEntityName} isAdmin={canEdit} onEdit={() => setSelectedMatch(match)} />
                                             ))}
                                         </div>
                                     </div>
@@ -658,7 +660,7 @@ export default function TournamentDashboard() {
                                             <h3 className="font-bold" style={{ color: 'var(--color-gold)' }}>Final</h3>
                                         </div>
                                         <div className="px-4 py-4">
-                                            <MatchRow match={finalMatch} getEntityName={getEntityName} isAdmin={isAdmin} onEdit={() => setSelectedMatch(finalMatch)} />
+                                            <MatchRow match={finalMatch} getEntityName={getEntityName} isAdmin={canEdit} onEdit={() => setSelectedMatch(finalMatch)} />
                                             {hasChampion && (
                                                 <div className="mt-4 text-center">
                                                     <p className="text-white/40 text-xs mb-1">🏆 Campeão</p>
@@ -855,7 +857,10 @@ export default function TournamentDashboard() {
             {selectedDuo && (
                 <DuoModal
                     duo={selectedDuo}
-                    canEdit={isSupreme || isAdmin || selectedDuo.player1?.id === profile?.id || selectedDuo.player2?.id === profile?.id}
+                    canEdit={canEdit || (
+                        tournament.status !== 'finished' &&
+                        (selectedDuo.player1?.id === profile?.id || selectedDuo.player2?.id === profile?.id)
+                    )}
                     onClose={() => setSelectedDuo(null)}
                     onSaved={(newName) => {
                         setDuos(prev => prev.map(d => d.id === selectedDuo.id ? { ...d, duo_name: newName } : d))
@@ -941,15 +946,22 @@ function DuoModal({ duo, canEdit, onClose, onSaved }: {
 }) {
     const [duoName, setDuoName] = useState(duo.duo_name ?? '')
     const [saving, setSaving] = useState(false)
+    const [error, setError] = useState('')
 
     const displayName = duo.duo_name
         ?? `${duo.player1?.username ?? duo.player1?.name ?? '?'} & ${duo.player2?.username ?? duo.player2?.name ?? '?'}`
 
     async function handleSave() {
         setSaving(true)
-        await supabase.from('duos').update({ duo_name: duoName.trim() || null }).eq('id', duo.id)
-        onSaved(duoName.trim() || null)
+        setError('')
+        // RPC valida no banco: admin que pode editar ou um dos jogadores da dupla
+        const { data, error } = await supabase.rpc('rename_duo', { p_duo_id: duo.id, p_name: duoName })
         setSaving(false)
+        if (error) {
+            setError(error.code === '42501' ? 'Sem permissão para renomear esta dupla.' : 'Erro ao salvar.')
+            return
+        }
+        onSaved((data as string | null) ?? null)
     }
 
     return (
@@ -985,9 +997,10 @@ function DuoModal({ duo, canEdit, onClose, onSaved }: {
                             <div>
                                 <label className="text-white/50 text-xs mb-1 block">Nome da dupla</label>
                                 <input type="text" value={duoName} onChange={e => setDuoName(e.target.value)}
-                                    placeholder="Ex: Os Crias"
+                                    placeholder="Ex: Os Crias" maxLength={40}
                                     className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/30 border border-white/20 focus:outline-none focus:border-yellow-500 text-sm" />
                             </div>
+                            {error && <p className="text-red-400 text-sm text-center">{error}</p>}
                             <div className="flex gap-3">
                                 <button onClick={onClose}
                                     className="flex-1 py-3 rounded-xl text-white border border-white/20 hover:bg-white/10 transition font-medium text-sm">
