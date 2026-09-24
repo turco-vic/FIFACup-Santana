@@ -4,12 +4,11 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../contexts/ToastContext'
 import type { TournamentMode, TournamentFormat } from '../types'
-import { ArrowLeft, Swords, Handshake, Trophy, List, GitBranch } from 'lucide-react'
+import { ArrowLeft, Swords, Handshake, Trophy, List } from 'lucide-react'
 
 const FORMATS_1V1: { value: TournamentFormat; label: string; sub: string; icon: typeof Swords }[] = [
     { value: 'groups_knockout', label: 'Grupos + Mata-mata', sub: 'Fase de grupos e eliminatórias', icon: Trophy },
     { value: 'league', label: 'Liga', sub: 'Pontos corridos, todos jogam contra todos', icon: List },
-    { value: 'knockout', label: 'Mata-mata', sub: 'Eliminação direta desde a primeira rodada', icon: GitBranch },
 ]
 
 const FORMATS_2V2: { value: TournamentFormat; label: string; sub: string; icon: typeof Swords }[] = [

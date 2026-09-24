@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { useToast } from '../contexts/ToastContext'
 import { useStandings } from '../hooks/useStandings'
 import GroupTable from '../components/GroupTable'
 import type { Tournament, Profile, Match, TournamentPlayer } from '../types'
@@ -25,6 +26,14 @@ const STAGE_LABEL: Record<string, string> = {
     groups: 'Grupos', round32: '16avos', round16: 'Oitavas',
     quarters: 'Quartas', semis: 'Semifinal',
     final: 'Final', league: 'Liga', knockout: 'Mata-mata',
+}
+
+// 1ª fase do mata-mata conforme o nº de grupos (2 primeiros de cada avançam)
+const FIRST_KO_STAGE: Record<number, { stage: string; label: string }> = {
+    2: { stage: 'semis', label: 'Semifinais' },
+    4: { stage: 'quarters', label: 'Quartas de Final' },
+    8: { stage: 'round16', label: 'Oitavas de Final' },
+    16: { stage: 'round32', label: '16avos de Final' },
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -52,6 +61,7 @@ export default function TournamentDashboard() {
     const { id } = useParams<{ id: string }>()
     const { profile, loading: authLoading, isSupreme } = useAuth()
     const navigate = useNavigate()
+    const { showToast } = useToast()
 
     const [tournament, setTournament] = useState<Tournament | null>(null)
     const [players, setPlayers] = useState<Profile[]>([])
@@ -189,11 +199,14 @@ export default function TournamentDashboard() {
 
     async function handleGenerateFirstKORound() {
         if (!tournament || !id || groups.length === 0) return
+        const n = groups.length
+        const firstStage = FIRST_KO_STAGE[n]?.stage
+        if (!firstStage) {
+            showToast(`Número de grupos (${n}) não suportado para o mata-mata.`)
+            return
+        }
         setGeneratingBracket(true)
         const groupStandings = groups.map(g => getGroupStandingsForBracket(g))
-        const n = groups.length
-        // 4 groups → quarters, 8 groups → round16, 16 groups → round32
-        const firstStage = n <= 4 ? 'quarters' : n <= 8 ? 'round16' : 'round32'
         const koMatches: any[] = []
         for (let i = 0; i + 1 < n; i += 2) {
             koMatches.push({
@@ -210,7 +223,8 @@ export default function TournamentDashboard() {
         for (const s of ['round32', 'round16', 'quarters', 'semis', 'final']) {
             await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', s)
         }
-        await supabase.from('matches').insert(koMatches.filter(m => m.home_id && m.away_id))
+        const { error } = await supabase.from('matches').insert(koMatches.filter(m => m.home_id && m.away_id))
+        if (error) showToast('Erro ao gerar o mata-mata. Tente novamente.')
         setGeneratingBracket(false)
         fetchAll(id)
     }
@@ -226,18 +240,25 @@ export default function TournamentDashboard() {
                 ? m.home_score > m.away_score ? m.home_id : m.away_id
                 : null
         const next: any[] = []
-        for (let i = 0; i + 1 < prev.length; i += 2) {
-            const wh = getWinner(prev[i]), wa = getWinner(prev[i + 1])
-            if (wh && wa) next.push({
-                tournament_id: id, mode: tournament.mode, stage: toStage,
-                home_id: wh, away_id: wa, played: false, match_order: i / 2,
-            })
+        // Em blocos de 4 jogos, cruza 0×2 e 1×3 (mesmo critério de handleGenerateSemis):
+        // o 1º e o 2º de um mesmo grupo ficam em lados opostos e só podem se reencontrar na final
+        for (let b = 0; b + 3 < prev.length; b += 4) {
+            for (const [x, y] of [[b, b + 2], [b + 1, b + 3]]) {
+                const wh = getWinner(prev[x]), wa = getWinner(prev[y])
+                if (wh && wa) next.push({
+                    tournament_id: id, mode: tournament.mode, stage: toStage,
+                    home_id: wh, away_id: wa, played: false, match_order: next.length,
+                })
+            }
         }
         const allLater = ['round16', 'quarters', 'semis', 'final']
         for (const s of allLater.slice(allLater.indexOf(toStage))) {
             await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', s)
         }
-        if (next.length > 0) await supabase.from('matches').insert(next)
+        if (next.length > 0) {
+            const { error } = await supabase.from('matches').insert(next)
+            if (error) showToast('Erro ao gerar a próxima fase. Tente novamente.')
+        }
         setGeneratingBracket(false)
         fetchAll(id)
     }
@@ -267,7 +288,8 @@ export default function TournamentDashboard() {
         if (semiMatches.length === 0) { setGeneratingBracket(false); return }
         await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', 'semis')
         await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', 'final')
-        await supabase.from('matches').insert(semiMatches)
+        const { error } = await supabase.from('matches').insert(semiMatches)
+        if (error) showToast('Erro ao gerar as semifinais. Tente novamente.')
         setGeneratingBracket(false)
         fetchAll(id)
     }
@@ -286,10 +308,11 @@ export default function TournamentDashboard() {
         const finalHome = getWinner(semis[0]), finalAway = getWinner(semis[1])
         if (!finalHome || !finalAway) { setGeneratingBracket(false); return }
         await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', 'final')
-        await supabase.from('matches').insert({
+        const { error } = await supabase.from('matches').insert({
             tournament_id: id, mode: tournament.mode, stage: 'final',
             home_id: finalHome, away_id: finalAway, played: false, match_order: 999,
         })
+        if (error) showToast('Erro ao gerar a final. Tente novamente.')
         setGeneratingBracket(false)
         fetchAll(id)
     }
@@ -327,8 +350,8 @@ export default function TournamentDashboard() {
     const round16Exist = round16Matches.length > 0
     const allRound32Played = round32Exist && round32Matches.every(m => m.played)
     const allRound16Played = round16Exist && round16Matches.every(m => m.played)
-    const firstKOLabel = groups.length <= 4 ? 'Quartas de Final' : groups.length <= 8 ? 'Oitavas de Final' : '16avos de Final'
-    const anyKOExists = round32Exist || round16Exist || quartersExist
+    const firstKOLabel = FIRST_KO_STAGE[groups.length]?.label ?? 'Mata-mata'
+    const anyKOExists = round32Exist || round16Exist || quartersExist || semisExist || !!finalMatch
 
     useEffect(() => {
         if (hasChampion) {

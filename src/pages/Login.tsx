@@ -17,10 +17,17 @@ export default function Login() {
     const [showReset, setShowReset] = useState(false)
 
     useEffect(() => {
-        if (!loading && profile) {
+        if (loading || !profile) return
+        if (profile.status === 'active') {
             navigate('/', { replace: true })
+            return
         }
-    }, [loading, profile])
+        // Sessão de conta pendente/bloqueada (ex.: link de reset de senha): encerra em vez de voltar para "/"
+        setError(profile.status === 'pending'
+            ? 'Sua conta ainda não foi aprovada. Aguarde o AdminSupremo.'
+            : 'Sua conta foi bloqueada. Entre em contato com o administrador.')
+        supabase.auth.signOut()
+    }, [loading, profile, navigate])
 
     async function handleResetPassword() {
         if (!resetEmail) return

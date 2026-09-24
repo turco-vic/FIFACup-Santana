@@ -15,6 +15,15 @@ const STATUS_LABEL: Record<string, string> = {
 
 type Duo = { p1: string; p2: string }
 
+// Top 2 de cada grupo avançam: o nº de grupos precisa ser potência de 2 para a chave fechar
+// (2 grupos → semis, 4 → quartas, 8 → oitavas). Retorna null se o nº de jogadores não é suportado.
+function planGroups(playerCount: number): number | null {
+    if (playerCount >= 4 && playerCount <= 7) return 2
+    if (playerCount >= 8 && playerCount <= 20) return 4
+    if (playerCount >= 21 && playerCount <= 40) return 8
+    return null
+}
+
 export default function TournamentManage() {
     const { id } = useParams<{ id: string }>()
     const { profile, loading: authLoading, isSupreme } = useAuth()
@@ -67,6 +76,24 @@ export default function TournamentManage() {
 
     async function handleRemovePlayer(playerId: string) {
         if (!id) return
+        if (playerId === profile?.id) {
+            showToast('Você não pode remover a si mesmo.')
+            return
+        }
+        if (savedDuos.some(d => d.player1_id === playerId || d.player2_id === playerId)) {
+            showToast('Jogador está em uma dupla. Resete o campeonato antes de removê-lo.')
+            return
+        }
+        const { count } = await supabase
+            .from('matches')
+            .select('id', { count: 'exact', head: true })
+            .eq('tournament_id', id)
+            .or(`home_id.eq.${playerId},away_id.eq.${playerId}`)
+        if ((count ?? 0) > 0) {
+            showToast('Jogador já tem partidas. Resete o campeonato antes de removê-lo.')
+            return
+        }
+        if (!window.confirm(`Remover ${getPlayerName(playerId)} do campeonato?`)) return
         await supabase.from('tournament_players').delete().eq('tournament_id', id).eq('player_id', playerId)
         setPlayers(prev => prev.filter(p => p.player_id !== playerId))
         showToast('Jogador removido.')
@@ -95,8 +122,10 @@ export default function TournamentManage() {
         for (let i = 0; i < shuffled.length - 1; i += 2) {
             newDuos.push({ p1: shuffled[i], p2: shuffled[i + 1] })
         }
-        // Se ímpar, último fica sem dupla
         setDuos(newDuos)
+        if (shuffled.length % 2 === 1) {
+            showToast(`Número ímpar: ${getPlayerName(shuffled[shuffled.length - 1])} ficou sem dupla.`)
+        }
     }
 
     function handleAddDuo() {
@@ -128,6 +157,17 @@ export default function TournamentManage() {
             return
         }
 
+        // Recriar duplas gera IDs novos e deixaria as partidas existentes órfãs
+        const { count: matchCount } = await supabase
+            .from('matches')
+            .select('id', { count: 'exact', head: true })
+            .eq('tournament_id', id)
+        if ((matchCount ?? 0) > 0) {
+            showToast('Já existem partidas. Resete o campeonato antes de refazer as duplas.')
+            setWorking(false)
+            return
+        }
+
         // Deletar duplas antigas
         await supabase.from('duos').delete().eq('tournament_id', id)
 
@@ -154,26 +194,41 @@ export default function TournamentManage() {
 
     async function handleGenerateMatches() {
         if (!tournament || !id) return
+        const playerIds = players.map(p => p.player_id)
+
+        // Validações antes de apagar qualquer coisa
+        if (tournament.mode === '2v2' && savedDuos.length < 2) {
+            showToast('Salve pelo menos 2 duplas primeiro.')
+            return
+        }
+        if (tournament.mode === '1v1' && playerIds.length < 2) {
+            showToast('Mínimo 2 jogadores.')
+            return
+        }
+        if (tournament.format === 'groups_knockout' && planGroups(playerIds.length) === null) {
+            showToast('Grupos + mata-mata aceita de 4 a 40 jogadores.')
+            return
+        }
+
         setWorking(true)
+        const { count: playedCount } = await supabase
+            .from('matches')
+            .select('id', { count: 'exact', head: true })
+            .eq('tournament_id', id)
+            .eq('played', true)
+        if ((playedCount ?? 0) > 0 && !window.confirm(
+            `Já existem ${playedCount} partida(s) com resultado. Regerar APAGA todos os resultados. Continuar?`
+        )) {
+            setWorking(false)
+            return
+        }
 
         if (tournament.mode === '2v2') {
-            if (savedDuos.length < 2) {
-                showToast('Salve pelo menos 2 duplas primeiro.')
-                setWorking(false)
-                return
-            }
             await generateLeague2v2(savedDuos.map(d => d.id))
         } else {
-            const playerIds = players.map(p => p.player_id)
-            if (playerIds.length < 2) {
-                showToast('Mínimo 2 jogadores.')
-                setWorking(false)
-                return
-            }
             await supabase.from('matches').delete().eq('tournament_id', id)
             if (tournament.format === 'groups_knockout') await generateGroups(playerIds)
             else if (tournament.format === 'league') await generateLeague1v1(playerIds)
-            else if (tournament.format === 'knockout') await generateKnockout(playerIds)
         }
 
         showToast('Partidas geradas!')
@@ -210,12 +265,11 @@ export default function TournamentManage() {
         await supabase.from('groups').delete().eq('tournament_id', id)
 
         const shuffled = [...playerIds].sort(() => Math.random() - 0.5)
-        // numGroups must be in {4, 8, 16} so that top-2 × numGroups = 8/16/32 qualifiers (power of 2)
-        const numGroups = [4, 8, 16].find(ng => {
-            const size = Math.ceil(shuffled.length / ng)
-            return size >= 2 && size <= 5
-        }) ?? 4
-        const groupSize = Math.ceil(shuffled.length / numGroups)
+        const numGroups = planGroups(shuffled.length)
+        if (numGroups === null) return
+        // Distribuição round-robin: tamanhos diferem no máximo em 1, nunca há grupo vazio
+        const buckets: string[][] = Array.from({ length: numGroups }, () => [])
+        shuffled.forEach((pid, i) => buckets[i % numGroups].push(pid))
 
         for (let g = 0; g < numGroups; g++) {
             const { data: group } = await supabase
@@ -223,7 +277,7 @@ export default function TournamentManage() {
                 .select().single()
             if (!group) continue
 
-            const groupPlayers = shuffled.slice(g * groupSize, (g + 1) * groupSize)
+            const groupPlayers = buckets[g]
             await supabase.from('group_members').insert(groupPlayers.map(pid => ({ group_id: group.id, player_id: pid })))
 
             const matchesToInsert = []
@@ -252,21 +306,6 @@ export default function TournamentManage() {
                     played: false, match_order: matchesToInsert.length,
                 })
             }
-        }
-        await supabase.from('matches').insert(matchesToInsert)
-    }
-
-    async function generateKnockout(playerIds: string[]) {
-        if (!id) return
-        await supabase.from('matches').delete().eq('tournament_id', id)
-        const shuffled = [...playerIds].sort(() => Math.random() - 0.5)
-        const matchesToInsert = []
-        for (let i = 0; i < shuffled.length - 1; i += 2) {
-            matchesToInsert.push({
-                tournament_id: id, mode: '1v1', stage: 'knockout',
-                home_id: shuffled[i], away_id: shuffled[i + 1],
-                played: false, match_order: i / 2,
-            })
         }
         await supabase.from('matches').insert(matchesToInsert)
     }
@@ -529,9 +568,11 @@ export default function TournamentManage() {
                         {!is2v2 && (
                             <p className="text-white/40 text-sm">
                                 {players.length} jogadores · {
-                                    tournament.format === 'groups_knockout' ? 'Grupos de até 4 + Mata-mata' :
-                                    tournament.format === 'league' ? 'Todos jogam contra todos' :
-                                    'Mata-mata direto'
+                                    tournament.format === 'groups_knockout'
+                                        ? (planGroups(players.length) !== null
+                                            ? `${planGroups(players.length)} grupos, 2 primeiros → mata-mata`
+                                            : 'Grupos + mata-mata aceita de 4 a 40 jogadores')
+                                        : 'Todos jogam contra todos'
                                 }
                             </p>
                         )}

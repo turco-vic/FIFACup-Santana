@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Match } from '../types'
 import { X } from 'lucide-react'
@@ -11,78 +11,19 @@ type Props = {
     onClose: () => void
 }
 
-async function generateNextRound(match: Match, homeScore: number, awayScore: number) {
-    if (match.stage === 'quarters') {
-        const { data: quarters } = await supabase
-            .from('matches')
-            .select('*')
-            .eq('mode', '1v1')
-            .eq('stage', 'quarters')
-            .order('match_order')
-
-        if (!quarters) return
-
-        const updated = quarters.map(q =>
-            q.id === match.id
-                ? { ...q, home_score: homeScore, away_score: awayScore, played: true }
-                : q
-        )
-
-        const allPlayed = updated.every(q => q.played)
-        if (!allPlayed) return
-
-        const winners = updated.map(q =>
-            (q.home_score ?? 0) > (q.away_score ?? 0) ? q.home_id : q.away_id
-        )
-
-        await supabase.from('matches').delete().eq('mode', '1v1').eq('stage', 'semis')
-        await supabase.from('matches').insert([
-            { mode: '1v1', stage: 'semis', home_id: winners[0], away_id: winners[1], match_order: 0, played: false },
-            { mode: '1v1', stage: 'semis', home_id: winners[2], away_id: winners[3], match_order: 1, played: false },
-        ])
-    }
-
-    if (match.stage === 'semis') {
-        const { data: semis } = await supabase
-            .from('matches')
-            .select('*')
-            .eq('mode', '1v1')
-            .eq('stage', 'semis')
-            .order('match_order')
-
-        if (!semis) return
-
-        const updated = semis.map(s =>
-            s.id === match.id
-                ? { ...s, home_score: homeScore, away_score: awayScore, played: true }
-                : s
-        )
-
-        const allPlayed = updated.every(s => s.played)
-        if (!allPlayed) return
-
-        const winners = updated.map(s =>
-            (s.home_score ?? 0) > (s.away_score ?? 0) ? s.home_id : s.away_id
-        )
-
-        await supabase.from('matches').delete().eq('mode', '1v1').eq('stage', 'final')
-        await supabase.from('matches').insert([
-            { mode: '1v1', stage: 'final', home_id: winners[0], away_id: winners[1], match_order: 0, played: false },
-        ])
-    }
-}
-
 export default function ScoreModal({ match, homeName, awayName, onClose }: Props) {
     const { showToast } = useToast()
     const [homeScore, setHomeScore] = useState(match.home_score?.toString() ?? '')
     const [awayScore, setAwayScore] = useState(match.away_score?.toString() ?? '')
     const [saving, setSaving] = useState(false)
+    const savingRef = useRef(false)
     const [error, setError] = useState('')
 
-    const isKnockout = ['quarters', 'semis', 'final'].includes(match.stage)
+    const isKnockout = ['round32', 'round16', 'quarters', 'semis', 'final', 'knockout'].includes(match.stage)
     const is1v1 = match.mode === '1v1'
 
     async function handleSave() {
+        if (savingRef.current) return
         const hs = parseInt(homeScore)
         const as_ = parseInt(awayScore)
 
@@ -96,6 +37,7 @@ export default function ScoreModal({ match, homeName, awayName, onClose }: Props
             return
         }
 
+        savingRef.current = true
         setSaving(true)
 
         const { error: matchError } = await supabase
@@ -105,6 +47,7 @@ export default function ScoreModal({ match, homeName, awayName, onClose }: Props
 
         if (matchError) {
             setError('Erro ao salvar.')
+            savingRef.current = false
             setSaving(false)
             return
         }
@@ -128,7 +71,7 @@ export default function ScoreModal({ match, homeName, awayName, onClose }: Props
                 body: {
                     title: 'FifaCup: Novo Resultado! ⚽',
                     body: `${homeName} ${hs} x ${as_} ${awayName}`,
-                    url: '/stats' // Link para onde o usuário vai ao clicar
+                    url: `/tournament/${match.tournament_id}` // Link para onde o usuário vai ao clicar
                 }
             })
         } catch (pushErr) {
@@ -136,10 +79,6 @@ export default function ScoreModal({ match, homeName, awayName, onClose }: Props
             // Não bloqueamos o fluxo se o push falhar
         }
         // -----------------------------------
-
-        if (['quarters', 'semis'].includes(match.stage)) {
-            await generateNextRound(match, hs, as_)
-        }
 
         showToast('Resultado salvo e notificações enviadas!')
         onClose()
