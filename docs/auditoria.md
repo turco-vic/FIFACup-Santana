@@ -91,7 +91,9 @@ Levantamento: comparação dos arquivos removidos na Fase 1 (`10db328^`) com o s
 - [x] 2. Fisher-Yates (`src/lib/shuffle.ts`) no sorteio de grupos e duplas (TournamentManage).
   Medido em 200 mil sorteios com 8 jogadores: com `sort(random)`, a chance de um jogador sair
   em 1º variava de 8,2% a 22,1% (justo: 12,5%); com Fisher-Yates, 12,4–12,6%.
-- [ ] 3. Estatísticas da dupla no DuoModal + link dos jogadores para `/player/:id`.
+- [x] 3. DuoModal (dashboard 2v2): J/V/E/D, gols pró:contra, saldo e pontos na liga via
+  `computeStandings` (mesma conta da tabela de onde o modal abre); jogadores com link para
+  `/player/:id`; edição do nome mantida; modal rola em telas baixas.
 - [ ] 4. Revisão dos grupos antes de salvar.
 
 ### Limpeza final

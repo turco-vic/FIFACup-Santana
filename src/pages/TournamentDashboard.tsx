@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { Link, useParams, useNavigate } from 'react-router-dom'
 import { supabase, check } from '../lib/supabase'
 import { getWinner, penaltiesLabel } from '../lib/matches'
 import { KO_STAGE_ORDER, firstRoundFromGroups, planBracket, planIsEmpty, type BracketPlan, type Pair } from '../lib/bracket'
@@ -12,7 +12,7 @@ import GroupTable from '../components/GroupTable'
 import type { Tournament, Profile, Match, MatchStage, TournamentPlayer } from '../types'
 import {
     ArrowLeft, MapPin, Calendar, Copy, Check,
-    Trophy, Settings, Swords, Handshake, Pencil, Plus, Clock, X, Save, RefreshCw, AlertTriangle
+    Trophy, Settings, Swords, Handshake, Pencil, Plus, Clock, X, Save, RefreshCw, AlertTriangle, ChevronRight
 } from 'lucide-react'
 import { Skeleton } from '../components/Skeleton'
 import ScoreModal from '../components/ScoreModal'
@@ -723,6 +723,7 @@ export default function TournamentDashboard() {
             {selectedDuo && (
                 <DuoModal
                     duo={selectedDuo}
+                    leagueMatches={leagueMatches}
                     canEdit={canEdit || (
                         tournament.status !== 'finished' &&
                         (selectedDuo.player1?.id === profile?.id || selectedDuo.player2?.id === profile?.id)
@@ -863,8 +864,9 @@ function ChampionCard({ name, onCelebrate }: { name: string; onCelebrate: () => 
     )
 }
 
-function DuoModal({ duo, canEdit, onClose, onSaved }: {
+function DuoModal({ duo, leagueMatches, canEdit, onClose, onSaved }: {
     duo: DuoWithPlayers
+    leagueMatches: Match[]
     canEdit: boolean
     onClose: () => void
     onSaved: (newName: string | null) => void
@@ -875,6 +877,8 @@ function DuoModal({ duo, canEdit, onClose, onSaved }: {
 
     const displayName = duo.duo_name
         ?? `${duo.player1?.username ?? duo.player1?.name ?? '?'} & ${duo.player2?.username ?? duo.player2?.name ?? '?'}`
+    // Mesma conta da tabela da liga, de onde o modal é aberto
+    const [stats] = computeStandings([{ id: duo.id, name: displayName }], leagueMatches)
 
     async function handleSave() {
         setSaving(true)
@@ -891,7 +895,7 @@ function DuoModal({ duo, canEdit, onClose, onSaved }: {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
-            <div className="w-full max-w-sm rounded-2xl border border-white/10" style={{ backgroundColor: 'var(--color-green)' }}>
+            <div className="w-full max-w-sm max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10" style={{ backgroundColor: 'var(--color-green)' }}>
                 <div className="flex items-center justify-between p-6 pb-4">
                     <div>
                         <h2 className="text-white font-bold text-lg">Dupla</h2>
@@ -902,7 +906,8 @@ function DuoModal({ duo, canEdit, onClose, onSaved }: {
                 <div className="px-6 pb-6 flex flex-col gap-4">
                     <div className="flex flex-col gap-2">
                         {[duo.player1, duo.player2].map((p, i) => p && (
-                            <div key={i} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/5">
+                            <Link key={i} to={`/player/${p.id}`} onClick={onClose}
+                                className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 transition">
                                 <div className="w-8 h-8 rounded-full overflow-hidden bg-white/10 flex-shrink-0 flex items-center justify-center border"
                                     style={{ borderColor: 'var(--color-gold)' }}>
                                     {p.avatar_url
@@ -910,13 +915,52 @@ function DuoModal({ duo, canEdit, onClose, onSaved }: {
                                         : <span className="text-white/40 text-sm font-bold">{p.name?.charAt(0) ?? '?'}</span>
                                     }
                                 </div>
-                                <div className="min-w-0">
+                                <div className="min-w-0 flex-1">
                                     <p className="text-white text-sm font-medium truncate">{p.name}</p>
                                     {p.username && <p className="text-white/40 text-xs">@{p.username}</p>}
                                 </div>
-                            </div>
+                                <ChevronRight size={14} className="text-white/30 flex-shrink-0" />
+                            </Link>
                         ))}
                     </div>
+
+                    {stats.played > 0 ? (
+                        <div className="rounded-xl bg-white/5 px-3 py-3">
+                            <p className="text-white/40 text-xs font-bold uppercase tracking-wider mb-2">Na liga</p>
+                            <div className="grid grid-cols-4 gap-2 text-center mb-3">
+                                {[
+                                    { label: 'J', value: stats.played, color: 'text-white' },
+                                    { label: 'V', value: stats.wins, color: 'text-green-400' },
+                                    { label: 'E', value: stats.draws, color: 'text-white/70' },
+                                    { label: 'D', value: stats.losses, color: 'text-red-400' },
+                                ].map(({ label, value, color }) => (
+                                    <div key={label}>
+                                        <p className={`font-bold text-lg ${color}`}>{value}</p>
+                                        <p className="text-white/40 text-xs">{label}</p>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 text-center pt-3 border-t border-white/10">
+                                <div>
+                                    <p className="font-bold text-white">{stats.goals_for}:{stats.goals_against}</p>
+                                    <p className="text-white/40 text-xs">Gols</p>
+                                </div>
+                                <div>
+                                    <p className={`font-bold ${stats.goal_diff > 0 ? 'text-green-400' : stats.goal_diff < 0 ? 'text-red-400' : 'text-white'}`}>
+                                        {stats.goal_diff > 0 ? `+${stats.goal_diff}` : stats.goal_diff}
+                                    </p>
+                                    <p className="text-white/40 text-xs">Saldo</p>
+                                </div>
+                                <div>
+                                    <p className="font-bold" style={{ color: 'var(--color-gold)' }}>{stats.points}</p>
+                                    <p className="text-white/40 text-xs">Pontos</p>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <p className="text-white/30 text-xs text-center">Nenhum jogo da liga disputado ainda.</p>
+                    )}
+
                     {canEdit && (
                         <>
                             <div>
