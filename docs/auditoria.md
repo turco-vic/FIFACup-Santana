@@ -60,7 +60,7 @@ Ordem de aplicação:
 - [x] `FORMAT_LABEL` e `STATUS_LABEL` em `src/lib/labels.ts` (as cores de status continuam
   em cada tela).
 
-### Bloco 4.4 — código pronto, falta aplicar
+### Bloco 4.4 — código pronto (aplicação pelo usuário: migration do realtime + deploy)
 
 Ordem de aplicação:
 1. SQL editor: `supabase/migrations/20260924130000_fase4_bloco4_realtime.sql`
@@ -78,6 +78,19 @@ Ordem de aplicação:
 - [x] "Campeonatos" no BottomNav (jogador e supreme); fica ativo também em `/tournament/:id`.
 - [x] "Turco" fixo removido da Sidebar, Home, Supreme e placeholder do CreateTournament.
   Mantidos de propósito: "Desenvolvido por Turco" e os links de Instagram/LinkedIn na Sidebar.
+
+### Bloco 4.5 — recuperação do legado (um item por vez, revisar cada um)
+Levantamento: comparação dos arquivos removidos na Fase 1 (`10db328^`) com o sistema atual.
+- [x] **1. Regerar fase já gerada** (só front). `src/lib/bracket.ts` planeja o chaveamento:
+  compara os confrontos esperados (ranking dos grupos / 2 primeiros da liga / vencedores da fase
+  anterior) com os existentes; confronto igual fica com o resultado, diferente sai e entra o novo,
+  em cascata até a final. "Gerar <fase>" e "Recalcular confrontos" usam o mesmo plano; se algo
+  vai ser apagado, um modal lista o que sai (com placar) e o que entra. Substituiu os 5 geradores
+  do dashboard. Classificação agora desempata empate total por nome/id (ordem estável).
+  Regerar os grupos (novo sorteio) continua em Gerenciar → Gerar / Regerar Partidas.
+- [ ] 2. Fisher-Yates no sorteio de grupos e duplas.
+- [ ] 3. Estatísticas da dupla no DuoModal + link dos jogadores para `/player/:id`.
+- [ ] 4. Revisão dos grupos antes de salvar.
 
 ### Limpeza final
 - [ ] Apagar campeonatos de teste (AAAAAAAAAA, VVVVVVVVVV, hdgeg) e conta de teste.

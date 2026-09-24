@@ -48,7 +48,9 @@ export function computeStandings(entities: Entity[], matches: Match[]): Standing
         }
     }
 
+    // Empate em todos os critérios: nome e id só para a ordem não depender de como o banco
+    // devolveu as linhas (o chaveamento do mata-mata sai desta ordem)
     return Object.values(table)
         .map(s => ({ ...s, goal_diff: s.goals_for - s.goals_against }))
-        .sort(compareStandings)
+        .sort((a, b) => compareStandings(a, b) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
 }

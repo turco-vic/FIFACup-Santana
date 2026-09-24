@@ -2,16 +2,17 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, check } from '../lib/supabase'
 import { getWinner, penaltiesLabel } from '../lib/matches'
+import { KO_STAGE_ORDER, firstRoundFromGroups, planBracket, planIsEmpty, type BracketPlan, type Pair } from '../lib/bracket'
 import { formatDate } from '../lib/format'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../contexts/ToastContext'
 import { computeStandings, profileEntity, tiedOnAllCriteria, type Entity } from '../lib/standings'
 import { FORMAT_LABEL, STATUS_LABEL } from '../lib/labels'
 import GroupTable from '../components/GroupTable'
-import type { Tournament, Profile, Match, TournamentPlayer } from '../types'
+import type { Tournament, Profile, Match, MatchStage, TournamentPlayer } from '../types'
 import {
     ArrowLeft, MapPin, Calendar, Copy, Check,
-    Trophy, Settings, Swords, Handshake, Pencil, Plus, Clock, X, Save
+    Trophy, Settings, Swords, Handshake, Pencil, Plus, Clock, X, Save, RefreshCw, AlertTriangle
 } from 'lucide-react'
 import { Skeleton } from '../components/Skeleton'
 import ScoreModal from '../components/ScoreModal'
@@ -25,11 +26,13 @@ const STAGE_LABEL: Record<string, string> = {
 }
 
 // 1ª fase do mata-mata conforme o nº de grupos (2 primeiros de cada avançam)
-const FIRST_KO_STAGE: Record<number, { stage: string; label: string }> = {
-    2: { stage: 'semis', label: 'Semifinais' },
-    4: { stage: 'quarters', label: 'Quartas de Final' },
-    8: { stage: 'round16', label: 'Oitavas de Final' },
-    16: { stage: 'round32', label: '16avos de Final' },
+const FIRST_KO_STAGE: Record<number, MatchStage> = {
+    2: 'semis', 4: 'quarters', 8: 'round16', 16: 'round32',
+}
+
+const STAGE_TITLE: Record<string, string> = {
+    round32: '16avos de Final', round16: 'Oitavas de Final',
+    quarters: 'Quartas de Final', semis: 'Semifinais', final: 'Final',
 }
 
 const STATUS_STYLE: Record<string, { color: string; bg: string }> = {
@@ -71,8 +74,8 @@ export default function TournamentDashboard() {
     const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
     const [selectedDuo, setSelectedDuo] = useState<DuoWithPlayers | null>(null)
     const [notMember, setNotMember] = useState(false)
-    const [generatingFinal, setGeneratingFinal] = useState(false)
     const [generatingBracket, setGeneratingBracket] = useState(false)
+    const [pendingPlan, setPendingPlan] = useState<BracketPlan | null>(null)
     const [showConfetti, setShowConfetti] = useState(false)
 
     useEffect(() => {
@@ -172,161 +175,44 @@ export default function TournamentDashboard() {
         )
     }
 
-    async function handleGenerateFinal() {
-        if (!tournament || !id) return
-        // Mesma ordem da tabela exibida: pontos, saldo, gols pró
-        if (leagueStandings.length < 2) return
-        setGeneratingFinal(true)
-        try {
-            check(await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', 'final'))
-            check(await supabase.from('matches').insert({
-                tournament_id: id, mode: tournament.mode, stage: 'final',
-                home_id: leagueStandings[0].id, away_id: leagueStandings[1].id,
-                played: false, match_order: 999,
-            }))
-        } catch (e) {
-            console.error(e)
-            showToast('Erro ao gerar a final. Tente novamente.')
-        } finally {
-            setGeneratingFinal(false)
-            fetchAll(id)
-        }
-    }
-
-    // Jogos de uma fase sem vencedor (empate antigo sem pênaltis) travam o avanço
-    function winnersOrWarn(stageMatches: Match[]): (string | null)[] | null {
-        const winners = stageMatches.map(getWinner)
-        const undecided = stageMatches.filter((_, i) => winners[i] === null)
-        if (undecided.length > 0) {
-            const m = undecided[0]
+    // Gerar uma fase ou recalcular o chaveamento: compara os confrontos esperados com os
+    // existentes (lib/bracket). Só criar partidas aplica direto; apagar alguma pede confirmação.
+    function requestPlan(createStage?: MatchStage) {
+        if (!bracketSource) return
+        const plan = planBracket(bracketSource.firstStage, bracketSource.pairs, matches, createStage)
+        if (plan.undecided.length > 0) {
+            const m = plan.undecided[0]
             showToast(`${getEntityName(m.home_id)} × ${getEntityName(m.away_id)} está sem vencedor. Edite o resultado e informe os pênaltis.`)
-            return null
-        }
-        return winners
-    }
-
-    async function handleGenerateFirstKORound() {
-        if (!tournament || !id || groups.length === 0) return
-        const n = groups.length
-        const firstStage = FIRST_KO_STAGE[n]?.stage
-        if (!firstStage) {
-            showToast(`Número de grupos (${n}) não suportado para o mata-mata.`)
             return
         }
-        setGeneratingBracket(true)
-        const groupStandings = groups.map(g => computeStandings(g.players.map(profileEntity), groupMatchesOf(g)))
-        const koMatches: any[] = []
-        for (let i = 0; i + 1 < n; i += 2) {
-            koMatches.push({
-                tournament_id: id, mode: tournament.mode, stage: firstStage,
-                home_id: groupStandings[i][0]?.id, away_id: groupStandings[i + 1]?.[1]?.id,
-                match_order: koMatches.length, played: false,
-            })
-            koMatches.push({
-                tournament_id: id, mode: tournament.mode, stage: firstStage,
-                home_id: groupStandings[i + 1]?.[0]?.id, away_id: groupStandings[i][1]?.id,
-                match_order: koMatches.length, played: false,
-            })
+        if (planIsEmpty(plan)) {
+            showToast(createStage ? 'Nada a gerar ainda.' : 'Os confrontos já batem com os resultados. Nada a recalcular.')
+            return
         }
-        try {
-            for (const s of ['round32', 'round16', 'quarters', 'semis', 'final']) {
-                check(await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', s))
-            }
-            check(await supabase.from('matches').insert(koMatches.filter(m => m.home_id && m.away_id)))
-        } catch (e) {
-            console.error(e)
-            showToast('Erro ao gerar o mata-mata. Tente novamente.')
-        } finally {
-            setGeneratingBracket(false)
-            fetchAll(id)
-        }
+        if (plan.remove.length === 0) applyPlan(plan)
+        else setPendingPlan(plan)
     }
 
-    async function handleAdvanceRound(fromStage: string, toStage: string) {
+    async function applyPlan(plan: BracketPlan) {
         if (!tournament || !id) return
-        const prev = matches
-            .filter(m => m.stage === fromStage)
-            .sort((a, b) => (a.match_order ?? 0) - (b.match_order ?? 0))
-        const winners = winnersOrWarn(prev)
-        if (!winners) return
+        setPendingPlan(null)
         setGeneratingBracket(true)
-        const next: any[] = []
-        // Em blocos de 4 jogos, cruza 0×2 e 1×3 (mesmo critério de handleGenerateSemis):
-        // o 1º e o 2º de um mesmo grupo ficam em lados opostos e só podem se reencontrar na final
-        for (let b = 0; b + 3 < prev.length; b += 4) {
-            for (const [x, y] of [[b, b + 2], [b + 1, b + 3]]) {
-                next.push({
-                    tournament_id: id, mode: tournament.mode, stage: toStage,
-                    home_id: winners[x], away_id: winners[y], played: false, match_order: next.length,
-                })
+        try {
+            if (plan.remove.length > 0) {
+                check(await supabase.from('matches').delete().in('id', plan.remove.map(m => m.id)))
             }
-        }
-        const allLater = ['round16', 'quarters', 'semis', 'final']
-        try {
-            for (const s of allLater.slice(allLater.indexOf(toStage))) {
-                check(await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', s))
+            if (plan.add.length > 0) {
+                check(await supabase.from('matches').insert(plan.add.map(a => ({
+                    ...a, tournament_id: id, mode: tournament.mode, played: false,
+                }))))
             }
-            if (next.length > 0) check(await supabase.from('matches').insert(next))
         } catch (e) {
             console.error(e)
-            showToast('Erro ao gerar a próxima fase. Tente novamente.')
+            // O plano é recalculado do zero a cada vez: repetir completa o que faltou
+            showToast('Erro ao atualizar o chaveamento. Tente de novo.')
         } finally {
             setGeneratingBracket(false)
-            fetchAll(id)
-        }
-    }
-
-    async function handleGenerateSemis() {
-        if (!tournament || !id) return
-        const quarters = matches
-            .filter(m => m.stage === 'quarters')
-            .sort((a, b) => (a.match_order ?? 0) - (b.match_order ?? 0))
-        const w = winnersOrWarn(quarters)
-        if (!w) return
-        const semi = (home: string | null, away: string | null, order: number) =>
-            ({ tournament_id: id, mode: tournament.mode, stage: 'semis', home_id: home, away_id: away, played: false, match_order: order })
-        const semiMatches = []
-        if (quarters.length === 4) {
-            semiMatches.push(semi(w[0], w[2], 0), semi(w[1], w[3], 1))
-        } else {
-            for (let i = 0; i + 1 < quarters.length; i += 2) semiMatches.push(semi(w[i], w[i + 1], i / 2))
-        }
-        if (semiMatches.length === 0) return
-        setGeneratingBracket(true)
-        try {
-            check(await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', 'semis'))
-            check(await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', 'final'))
-            check(await supabase.from('matches').insert(semiMatches))
-        } catch (e) {
-            console.error(e)
-            showToast('Erro ao gerar as semifinais. Tente novamente.')
-        } finally {
-            setGeneratingBracket(false)
-            fetchAll(id)
-        }
-    }
-
-    async function handleGenerateFinalKO() {
-        if (!tournament || !id) return
-        const semis = matches
-            .filter(m => m.stage === 'semis')
-            .sort((a, b) => (a.match_order ?? 0) - (b.match_order ?? 0))
-        if (semis.length < 2) return
-        const w = winnersOrWarn(semis)
-        if (!w) return
-        setGeneratingBracket(true)
-        try {
-            check(await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', 'final'))
-            check(await supabase.from('matches').insert({
-                tournament_id: id, mode: tournament.mode, stage: 'final',
-                home_id: w[0], away_id: w[1], played: false, match_order: 999,
-            }))
-        } catch (e) {
-            console.error(e)
-            showToast('Erro ao gerar a final. Tente novamente.')
-        } finally {
-            setGeneratingBracket(false)
-            fetchAll(id)
+            fetchAll(id, { silent: true })
         }
     }
 
@@ -355,21 +241,66 @@ export default function TournamentDashboard() {
     const hasChampion = !!championId
 
     const allGroupsPlayed = groupMatches.length > 0 && groupMatches.every(m => m.played)
-    const quartersExist = matches.some(m => m.stage === 'quarters')
-    const allQuartersPlayed = matches.filter(m => m.stage === 'quarters').length > 0 &&
-        matches.filter(m => m.stage === 'quarters').every(m => m.played)
-    const semisExist = matches.some(m => m.stage === 'semis')
-    const allSemisPlayed = matches.filter(m => m.stage === 'semis').length > 0 &&
-        matches.filter(m => m.stage === 'semis').every(m => m.played)
+    const koMatches = matches.filter(m => KO_STAGE_ORDER.includes(m.stage))
 
-    const round32Matches = matches.filter(m => m.stage === 'round32')
-    const round16Matches = matches.filter(m => m.stage === 'round16')
-    const round32Exist = round32Matches.length > 0
-    const round16Exist = round16Matches.length > 0
-    const allRound32Played = round32Exist && round32Matches.every(m => m.played)
-    const allRound16Played = round16Exist && round16Matches.every(m => m.played)
-    const firstKOLabel = FIRST_KO_STAGE[groups.length]?.label ?? 'Mata-mata'
-    const anyKOExists = round32Exist || round16Exist || quartersExist || semisExist || !!finalMatch
+    // De onde sai a 1ª fase eliminatória: ranking dos grupos, ou os 2 primeiros da liga (liga + final).
+    // null enquanto a fase anterior não terminou.
+    const bracketSource: { firstStage: MatchStage; pairs: Pair[] } | null = (() => {
+        if (tournament?.format === 'groups_knockout') {
+            const firstStage = FIRST_KO_STAGE[groups.length]
+            if (!firstStage || !allGroupsPlayed) return null
+            const rankings = groups.map(g =>
+                computeStandings(g.players.map(profileEntity), groupMatchesOf(g)).map(st => st.id))
+            return { firstStage, pairs: firstRoundFromGroups(rankings) }
+        }
+        if (tournament?.format === 'league_final') {
+            if (!allLeaguePlayed || leagueStandings.length < 2) return null
+            return { firstStage: 'final', pairs: [[leagueStandings[0].id, leagueStandings[1].id]] }
+        }
+        return null
+    })()
+
+    // Próxima fase a gerar: a 1ª, ou a seguinte à última existente quando ela terminou
+    const nextStage: MatchStage | null = (() => {
+        if (!bracketSource) return null
+        const stages = KO_STAGE_ORDER.slice(KO_STAGE_ORDER.indexOf(bracketSource.firstStage))
+        const existing = stages.filter(st => koMatches.some(m => m.stage === st))
+        if (existing.length === 0) return bracketSource.firstStage
+        const last = existing[existing.length - 1]
+        if (last === 'final' || !koMatches.filter(m => m.stage === last).every(m => m.played)) return null
+        return stages[stages.indexOf(last) + 1]
+    })()
+
+    const bracketActions = canEdit && bracketSource && (
+        <div className="flex flex-col gap-2">
+            {nextStage && (
+                <button
+                    onClick={() => requestPlan(nextStage)}
+                    disabled={generatingBracket}
+                    className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-40"
+                    style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
+                >
+                    <Trophy size={16} />
+                    {generatingBracket ? 'Gerando...' : `Gerar ${STAGE_TITLE[nextStage]}`}
+                </button>
+            )}
+            {koMatches.length > 0 && (
+                <>
+                    <button
+                        onClick={() => requestPlan()}
+                        disabled={generatingBracket}
+                        className="w-full py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 border border-white/20 text-white/60 hover:text-white hover:border-white/40 transition disabled:opacity-40"
+                    >
+                        <RefreshCw size={14} className={generatingBracket ? 'animate-spin' : ''} />
+                        Recalcular confrontos
+                    </button>
+                    <p className="text-white/30 text-xs text-center">
+                        Corrigiu um placar depois de gerar a fase seguinte? Recalcule para atualizar os confrontos.
+                    </p>
+                </>
+            )}
+        </div>
+    )
 
     useEffect(() => {
         if (hasChampion) {
@@ -525,14 +456,7 @@ export default function TournamentDashboard() {
                                                     </p>
                                                 )
                                         )}
-                                        {canEdit && allLeaguePlayed && !finalMatch && tournament.format === 'league_final' && (
-                                            <button onClick={handleGenerateFinal} disabled={generatingFinal}
-                                                className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition hover:opacity-90"
-                                                style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}>
-                                                <Trophy size={16} />
-                                                {generatingFinal ? 'Gerando...' : 'Gerar Final'}
-                                            </button>
-                                        )}
+                                        {tournament.format === 'league_final' && bracketActions}
                                     </div>
                                 )}
 
@@ -576,64 +500,10 @@ export default function TournamentDashboard() {
                                 {/* Bracket visual — formato grupos + mata-mata */}
                                 {tournament.format === 'groups_knockout' && (
                                     <div className="flex flex-col gap-4">
-                                        {canEdit && allGroupsPlayed && !anyKOExists && (
-                                            <button
-                                                onClick={handleGenerateFirstKORound}
-                                                disabled={generatingBracket}
-                                                className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-40"
-                                                style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
-                                            >
-                                                <Trophy size={16} />
-                                                {generatingBracket ? 'Gerando...' : `Gerar ${firstKOLabel}`}
-                                            </button>
-                                        )}
-                                        {canEdit && round32Exist && allRound32Played && !round16Exist && (
-                                            <button
-                                                onClick={() => handleAdvanceRound('round32', 'round16')}
-                                                disabled={generatingBracket}
-                                                className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-40"
-                                                style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
-                                            >
-                                                <Trophy size={16} />
-                                                {generatingBracket ? 'Gerando...' : 'Gerar Oitavas de Final'}
-                                            </button>
-                                        )}
-                                        {canEdit && round16Exist && allRound16Played && !quartersExist && (
-                                            <button
-                                                onClick={() => handleAdvanceRound('round16', 'quarters')}
-                                                disabled={generatingBracket}
-                                                className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-40"
-                                                style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
-                                            >
-                                                <Trophy size={16} />
-                                                {generatingBracket ? 'Gerando...' : 'Gerar Quartas de Final'}
-                                            </button>
-                                        )}
-                                        {canEdit && quartersExist && allQuartersPlayed && !semisExist && (
-                                            <button
-                                                onClick={handleGenerateSemis}
-                                                disabled={generatingBracket}
-                                                className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-40"
-                                                style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
-                                            >
-                                                <Trophy size={16} />
-                                                {generatingBracket ? 'Gerando...' : 'Gerar Semifinais'}
-                                            </button>
-                                        )}
-                                        {canEdit && semisExist && allSemisPlayed && !finalMatch && (
-                                            <button
-                                                onClick={handleGenerateFinalKO}
-                                                disabled={generatingBracket}
-                                                className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-40"
-                                                style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
-                                            >
-                                                <Trophy size={16} />
-                                                {generatingBracket ? 'Gerando...' : 'Gerar Final'}
-                                            </button>
-                                        )}
-                                        {anyKOExists && (
+                                        {bracketActions}
+                                        {koMatches.length > 0 && (
                                             <KnockoutBracket
-                                                matches={matches.filter(m => ['round32', 'round16', 'quarters', 'semis', 'final'].includes(m.stage))}
+                                                matches={koMatches}
                                                 players={players}
                                                 isAdmin={canEdit}
                                                 onSelectMatch={(match) => setSelectedMatch(match)}
@@ -840,6 +710,16 @@ export default function TournamentDashboard() {
                 />
             )}
 
+            {pendingPlan && (
+                <PlanConfirmModal
+                    plan={pendingPlan}
+                    getEntityName={getEntityName}
+                    working={generatingBracket}
+                    onCancel={() => setPendingPlan(null)}
+                    onConfirm={() => applyPlan(pendingPlan)}
+                />
+            )}
+
             {selectedDuo && (
                 <DuoModal
                     duo={selectedDuo}
@@ -885,6 +765,82 @@ function MatchRow({ match, getEntityName, isAdmin, onEdit }: {
                     {match.played ? <Pencil size={12} /> : <Plus size={12} />}
                 </button>
             )}
+        </div>
+    )
+}
+
+// Lista exatamente o que o recálculo apaga (com o resultado perdido) e o que cria
+function PlanConfirmModal({ plan, getEntityName, working, onCancel, onConfirm }: {
+    plan: BracketPlan
+    getEntityName: (id: string) => string
+    working: boolean
+    onCancel: () => void
+    onConfirm: () => void
+}) {
+    const byStage = <T extends { stage: MatchStage }>(list: T[]) =>
+        [...list].sort((a, b) => KO_STAGE_ORDER.indexOf(a.stage) - KO_STAGE_ORDER.indexOf(b.stage))
+    const lostResults = plan.remove.filter(m => m.played).length
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+            <div className="w-full max-w-sm max-h-[85vh] flex flex-col rounded-2xl border border-white/10" style={{ backgroundColor: 'var(--color-green)' }}>
+                <div className="flex items-center justify-between p-6 pb-3">
+                    <h2 className="text-white font-bold text-lg flex items-center gap-2">
+                        <AlertTriangle size={18} className="text-yellow-400" /> Atualizar confrontos
+                    </h2>
+                    <button onClick={onCancel} className="text-white/40 hover:text-white transition"><X size={20} /></button>
+                </div>
+
+                <div className="px-6 overflow-y-auto flex flex-col gap-4">
+                    {lostResults > 0 && (
+                        <p className="px-3 py-2 rounded-lg text-xs text-red-300 bg-red-500/10 border border-red-500/30">
+                            {lostResults} resultado{lostResults !== 1 ? 's' : ''} será{lostResults !== 1 ? 'ão' : ''} apagado{lostResults !== 1 ? 's' : ''}.
+                            Os confrontos que não mudaram continuam com o placar.
+                        </p>
+                    )}
+
+                    <div>
+                        <p className="text-white/50 text-xs font-bold uppercase tracking-wider mb-2">Sai</p>
+                        {byStage(plan.remove).map(m => (
+                            <div key={m.id} className="flex items-center gap-2 py-1.5 text-sm border-b border-white/5 last:border-0">
+                                <span className="text-xs text-white/40 w-16 flex-shrink-0">{STAGE_LABEL[m.stage]}</span>
+                                <span className="flex-1 min-w-0 truncate text-white">
+                                    {getEntityName(m.home_id)} × {getEntityName(m.away_id)}
+                                </span>
+                                {m.played
+                                    ? <span className="text-red-300 text-xs flex-shrink-0">{m.home_score}×{m.away_score} {penaltiesLabel(m)}</span>
+                                    : <span className="text-white/30 text-xs flex-shrink-0">sem resultado</span>}
+                            </div>
+                        ))}
+                    </div>
+
+                    {plan.add.length > 0 && (
+                        <div>
+                            <p className="text-white/50 text-xs font-bold uppercase tracking-wider mb-2">Entra</p>
+                            {byStage(plan.add).map(a => (
+                                <div key={`${a.stage}-${a.match_order}`} className="flex items-center gap-2 py-1.5 text-sm border-b border-white/5 last:border-0">
+                                    <span className="text-xs text-white/40 w-16 flex-shrink-0">{STAGE_LABEL[a.stage]}</span>
+                                    <span className="flex-1 min-w-0 truncate text-green-300">
+                                        {getEntityName(a.home_id)} × {getEntityName(a.away_id)}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex gap-3 p-6 pt-4">
+                    <button onClick={onCancel}
+                        className="flex-1 py-3 rounded-xl text-white border border-white/20 hover:bg-white/10 transition font-medium text-sm">
+                        Cancelar
+                    </button>
+                    <button onClick={onConfirm} disabled={working}
+                        className="flex-1 py-3 rounded-xl font-bold text-white text-sm transition disabled:opacity-50"
+                        style={{ backgroundColor: 'rgb(220,38,38)' }}>
+                        {working ? 'Aplicando...' : 'Confirmar'}
+                    </button>
+                </div>
+            </div>
         </div>
     )
 }
