@@ -79,7 +79,7 @@ Ordem de aplicação:
 - [x] "Turco" fixo removido da Sidebar, Home, Supreme e placeholder do CreateTournament.
   Mantidos de propósito: "Desenvolvido por Turco" e os links de Instagram/LinkedIn na Sidebar.
 
-### Bloco 4.5 — recuperação do legado (itens 1–4 prontos; revisão item a item)
+### Bloco 4.5 — recuperação do legado (itens 1–5; revisão item a item)
 Levantamento: comparação dos arquivos removidos na Fase 1 (`10db328^`) com o sistema atual.
 - [x] **1. Regerar fase já gerada** (só front). `src/lib/bracket.ts` planeja o chaveamento:
   compara os confrontos esperados (ranking dos grupos / 2 primeiros da liga / vencedores da fase
@@ -99,6 +99,11 @@ Levantamento: comparação dos arquivos removidos na Fase 1 (`10db328^`) com o s
   "Confirmar e gerar" grava grupos, membros e partidas (mantém a confirmação quando há
   resultados). Mostra os grupos atuais quando já existem. Se a lista de jogadores mudar
   depois do sorteio, pede para sortear de novo. Liga (1v1/2v2) continua com "Gerar / Regerar".
+- [x] 5. Montagem manual dos grupos (alternativa ao sorteio, paridade com as duplas):
+  "Montar à mão" cria os grupos vazios com todos em "Sem grupo"; na prévia (sorteada ou manual)
+  dá para mover jogadores tocando no jogador e depois no grupo de destino (funciona no celular)
+  ou arrastando (computador). Confirmar exige todos em algum grupo e cada grupo com 2+ jogadores
+  (`src/lib/groupDraft.ts`). Nada é gravado antes de confirmar.
 
 ### Limpeza final
 - [ ] Apagar campeonatos de teste (AAAAAAAAAA, VVVVVVVVVV, hdgeg) e conta de teste.

@@ -3,10 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, check } from '../lib/supabase'
 import { STATUS_LABEL } from '../lib/labels'
 import { shuffle } from '../lib/shuffle'
+import { POOL, draftProblem, emptyDraft, moveInDraft, type DraftTarget, type GroupDraft } from '../lib/groupDraft'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../contexts/ToastContext'
 import type { Tournament, Profile, TournamentPlayer } from '../types'
-import { ArrowLeft, Users, AlertTriangle, Shuffle, UserMinus, RefreshCw, X, Check } from 'lucide-react'
+import { ArrowLeft, Users, AlertTriangle, Shuffle, UserMinus, RefreshCw, X, Check, Hand } from 'lucide-react'
 import { Skeleton } from '../components/Skeleton'
 
 type Duo = { p1: string; p2: string }
@@ -36,8 +37,10 @@ export default function TournamentManage() {
     const [working, setWorking] = useState(false)
     const [showResetConfirm, setShowResetConfirm] = useState(false)
     const [selectingFor, setSelectingFor] = useState<{ duoIndex: number; slot: 1 | 2 } | null>(null)
-    // Grupos + mata-mata: sorteio fica só na tela até o admin confirmar (paridade com as duplas)
-    const [draftGroups, setDraftGroups] = useState<string[][] | null>(null)
+    // Grupos + mata-mata: sorteio ou montagem manual ficam só na tela até o admin confirmar
+    // (paridade com as duplas). movingPid = jogador tocado, esperando o grupo de destino.
+    const [draft, setDraft] = useState<GroupDraft | null>(null)
+    const [movingPid, setMovingPid] = useState<string | null>(null)
     const [savedGroups, setSavedGroups] = useState<string[][]>([])
 
     useEffect(() => {
@@ -110,7 +113,7 @@ export default function TournamentManage() {
             return
         }
         setPlayers(prev => prev.filter(p => p.player_id !== playerId))
-        setDraftGroups(null)
+        setDraft(null)
         showToast('Jogador removido.')
     }
 
@@ -224,7 +227,24 @@ export default function TournamentManage() {
         // Distribuição round-robin: tamanhos diferem no máximo em 1, nunca há grupo vazio
         const buckets: string[][] = Array.from({ length: numGroups }, () => [])
         shuffle(players.map(p => p.player_id)).forEach((pid, i) => buckets[i % numGroups].push(pid))
-        setDraftGroups(buckets)
+        setDraft({ groups: buckets, pool: [] })
+        setMovingPid(null)
+    }
+
+    // Montar à mão: grupos vazios (mesma quantidade do sorteio) e todos em "Sem grupo"
+    function handleManualGroups() {
+        const numGroups = planGroups(players.length)
+        if (numGroups === null) {
+            showToast('Grupos + mata-mata aceita de 4 a 40 jogadores.')
+            return
+        }
+        setDraft(emptyDraft(numGroups, players.map(p => p.player_id)))
+        setMovingPid(null)
+    }
+
+    function moveTo(playerId: string, target: DraftTarget) {
+        setDraft(prev => prev && moveInDraft(prev, playerId, target))
+        setMovingPid(null)
     }
 
     async function handleGenerateMatches() {
@@ -245,11 +265,10 @@ export default function TournamentManage() {
             return
         }
         if (tournament.format === 'groups_knockout') {
-            // O sorteio na tela precisa ter exatamente os jogadores atuais
-            const drafted = draftGroups?.flat() ?? []
-            if (drafted.length !== playerIds.length || !playerIds.every(pid => drafted.includes(pid))) {
-                setDraftGroups(null)
-                showToast('A lista de jogadores mudou desde o sorteio. Sorteie os grupos de novo.')
+            // Todos os jogadores atuais em algum grupo, e cada grupo com pelo menos 2
+            const problem = draft ? draftProblem(draft, playerIds) : 'Sorteie ou monte os grupos primeiro.'
+            if (problem) {
+                showToast(problem)
                 return
             }
         }
@@ -272,7 +291,7 @@ export default function TournamentManage() {
                 await generateLeague2v2(savedDuos.map(d => d.id))
             } else {
                 check(await supabase.from('matches').delete().eq('tournament_id', id))
-                if (tournament.format === 'groups_knockout') await generateGroups(draftGroups!)
+                if (tournament.format === 'groups_knockout') await generateGroups(draft!.groups)
                 else if (tournament.format === 'league') await generateLeague1v1(playerIds)
             }
         } catch (e) {
@@ -282,7 +301,7 @@ export default function TournamentManage() {
             return
         }
 
-        setDraftGroups(null)
+        setDraft(null)
         showToast('Partidas geradas!')
         setWorking(false)
         navigate(`/tournament/${id}`)
@@ -379,7 +398,7 @@ export default function TournamentManage() {
         setTournament(prev => prev ? { ...prev, status: 'setup' } : null)
         setDuos([])
         setSavedDuos([])
-        setDraftGroups(null)
+        setDraft(null)
         setSavedGroups([])
         setShowResetConfirm(false)
         setWorking(false)
@@ -402,7 +421,55 @@ export default function TournamentManage() {
 
     const is2v2 = tournament.mode === '2v2'
     const isGroupsKO = tournament.format === 'groups_knockout'
-    const shownGroups = draftGroups ?? savedGroups
+    const draftError = draft ? draftProblem(draft, players.map(p => p.player_id)) : null
+
+    // Um grupo (ou "Sem grupo") da prévia: recebe o jogador tocado ou arrastado
+    function renderDraftZone(target: DraftTarget, title: string, ids: string[]) {
+        const canReceive = movingPid !== null && !ids.includes(movingPid)
+        return (
+            <div
+                key={String(target)}
+                onClick={() => canReceive && moveTo(movingPid!, target)}
+                onDragOver={e => e.preventDefault()}
+                onDrop={e => {
+                    e.preventDefault()
+                    const pid = e.dataTransfer.getData('text/plain')
+                    if (pid) moveTo(pid, target)
+                }}
+                className={`rounded-lg border px-3 py-2 transition ${canReceive ? 'cursor-pointer' : ''}`}
+                style={canReceive
+                    ? { borderColor: 'var(--color-gold)', borderStyle: 'dashed', backgroundColor: 'rgba(201,153,42,0.18)' }
+                    : { borderColor: 'rgba(201,153,42,0.4)', backgroundColor: 'rgba(201,153,42,0.08)' }}
+            >
+                <p className="text-xs font-bold mb-1 flex items-center justify-between gap-1" style={{ color: 'var(--color-gold)' }}>
+                    <span>{title} <span className="text-white/40 font-normal">({ids.length})</span></span>
+                    {canReceive && <span className="text-[10px] font-normal text-white/60">mover para cá</span>}
+                </p>
+                {ids.map(pid => (
+                    <button
+                        key={pid}
+                        type="button"
+                        draggable
+                        onDragStart={e => { e.dataTransfer.setData('text/plain', pid); setMovingPid(pid) }}
+                        onDragEnd={() => setMovingPid(null)}
+                        onClick={e => {
+                            // Com outro jogador escolhido, tocar em alguém de outro grupo move para cá
+                            if (canReceive) return
+                            e.stopPropagation()
+                            setMovingPid(prev => prev === pid ? null : pid)
+                        }}
+                        className="w-full text-left text-xs truncate py-1 px-1.5 rounded transition cursor-grab"
+                        style={movingPid === pid
+                            ? { backgroundColor: 'var(--color-gold)', color: 'var(--color-green)', fontWeight: 700 }
+                            : { color: 'white' }}
+                    >
+                        {getPlayerName(pid)}
+                    </button>
+                ))}
+                {ids.length === 0 && <p className="text-white/25 text-xs italic py-1">vazio</p>}
+            </div>
+        )
+    }
     // Mesma regra do can_edit_tournament no banco: encerrado só o supreme edita
     const locked = tournament.status === 'finished' && !isSupreme
     const allPlayerIds = players.map(p => p.player_id)
@@ -646,19 +713,14 @@ export default function TournamentManage() {
                                 }
                             </p>
                         )}
-                        {/* Grupos + mata-mata: sortear → revisar na tela → confirmar e gravar */}
-                        {isGroupsKO && shownGroups.length > 0 && (
+                        {/* Grupos + mata-mata: sortear ou montar à mão → revisar/ajustar na tela → confirmar e gravar */}
+                        {isGroupsKO && !draft && savedGroups.length > 0 && (
                             <div>
-                                <p className="text-xs font-bold uppercase tracking-wider mb-2"
-                                    style={{ color: draftGroups ? 'var(--color-gold)' : 'rgba(255,255,255,0.4)' }}>
-                                    {draftGroups ? 'Prévia do sorteio — ainda não gravado' : 'Grupos atuais'}
-                                </p>
+                                <p className="text-xs font-bold uppercase tracking-wider mb-2 text-white/40">Grupos atuais</p>
                                 <div className="grid grid-cols-2 gap-2">
-                                    {shownGroups.map((group, i) => (
+                                    {savedGroups.map((group, i) => (
                                         <div key={i} className="rounded-lg border px-3 py-2"
-                                            style={draftGroups
-                                                ? { borderColor: 'rgba(201,153,42,0.4)', backgroundColor: 'rgba(201,153,42,0.08)' }
-                                                : { borderColor: 'rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.03)' }}>
+                                            style={{ borderColor: 'rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.03)' }}>
                                             <p className="text-xs font-bold mb-1" style={{ color: 'var(--color-gold)' }}>{groupName(i)}</p>
                                             {group.map(pid => (
                                                 <p key={pid} className="text-white text-xs truncate py-0.5">{getPlayerName(pid)}</p>
@@ -669,7 +731,26 @@ export default function TournamentManage() {
                             </div>
                         )}
 
-                        {isGroupsKO && (draftGroups ? (
+                        {isGroupsKO && draft && (
+                            <div>
+                                <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--color-gold)' }}>
+                                    Prévia — ainda não gravado
+                                </p>
+                                <p className="text-white/40 text-xs mb-2">
+                                    {movingPid
+                                        ? `Toque no grupo para onde mover ${getPlayerName(movingPid)}.`
+                                        : 'Para ajustar, toque num jogador e depois no grupo de destino (ou arraste).'}
+                                </p>
+                                {draft.pool.length > 0 && (
+                                    <div className="mb-2">{renderDraftZone(POOL, 'Sem grupo', draft.pool)}</div>
+                                )}
+                                <div className="grid grid-cols-2 gap-2">
+                                    {draft.groups.map((group, i) => renderDraftZone(i, groupName(i), group))}
+                                </div>
+                            </div>
+                        )}
+
+                        {isGroupsKO && (draft ? (
                             <>
                                 <div className="flex gap-2">
                                     <button
@@ -680,15 +761,27 @@ export default function TournamentManage() {
                                         <Shuffle size={14} /> Sortear de novo
                                     </button>
                                     <button
-                                        onClick={handleGenerateMatches}
+                                        onClick={handleManualGroups}
                                         disabled={working}
-                                        className="flex-1 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-40"
-                                        style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
+                                        className="flex-1 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 border border-white/20 text-white/70 hover:text-white transition disabled:opacity-40"
                                     >
-                                        {working ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} />}
-                                        {working ? 'Gerando...' : 'Confirmar e gerar'}
+                                        <Hand size={14} /> Montar do zero
                                     </button>
                                 </div>
+                                {draftError && (
+                                    <p className="px-3 py-2 rounded-lg text-xs text-yellow-400 bg-yellow-400/10 border border-yellow-400/20">
+                                        {draftError}
+                                    </p>
+                                )}
+                                <button
+                                    onClick={handleGenerateMatches}
+                                    disabled={working || !!draftError}
+                                    className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-40"
+                                    style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
+                                >
+                                    {working ? <RefreshCw size={16} className="animate-spin" /> : <Check size={16} />}
+                                    {working ? 'Gerando...' : 'Confirmar e gerar'}
+                                </button>
                                 <p className="text-white/30 text-xs text-center">
                                     {savedGroups.length > 0
                                         ? 'Confirmar substitui os grupos atuais e apaga as partidas já geradas.'
@@ -696,15 +789,24 @@ export default function TournamentManage() {
                                 </p>
                             </>
                         ) : (
-                            <button
-                                onClick={handleDrawGroups}
-                                disabled={working || planGroups(players.length) === null}
-                                className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-40"
-                                style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
-                            >
-                                <Shuffle size={16} />
-                                {savedGroups.length > 0 ? 'Sortear novos grupos' : 'Sortear grupos'}
-                            </button>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={handleDrawGroups}
+                                    disabled={working || planGroups(players.length) === null}
+                                    className="flex-1 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-40"
+                                    style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
+                                >
+                                    <Shuffle size={16} />
+                                    {savedGroups.length > 0 ? 'Sortear novos grupos' : 'Sortear grupos'}
+                                </button>
+                                <button
+                                    onClick={handleManualGroups}
+                                    disabled={working || planGroups(players.length) === null}
+                                    className="flex-1 py-3 rounded-xl font-bold flex items-center justify-center gap-2 border border-white/20 text-white/70 hover:text-white transition disabled:opacity-40"
+                                >
+                                    <Hand size={16} /> Montar à mão
+                                </button>
+                            </div>
                         ))}
 
                         {!isGroupsKO && (
