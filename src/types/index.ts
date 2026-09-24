@@ -98,6 +98,8 @@ export type Match = {
   away_id: string
   home_score: number | null
   away_score: number | null
+  home_penalties: number | null
+  away_penalties: number | null
   played: boolean
   match_order: number | null
   created_at: string

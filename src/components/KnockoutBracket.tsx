@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import type { Match, Profile } from '../types'
 import { Pencil, Plus, Trophy } from 'lucide-react'
+import { getWinner, penaltiesLabel } from '../lib/matches'
 
 type Props = {
     matches: Match[]
@@ -65,8 +66,9 @@ type MatchCardProps = {
 }
 
 function MatchCard({ match, homeLabel, awayLabel, players, isAdmin, onSelectMatch }: MatchCardProps) {
-    const homeWon = match?.played && match.home_score !== null && match.away_score !== null && match.home_score > match.away_score
-    const awayWon = match?.played && match.home_score !== null && match.away_score !== null && match.away_score > match.home_score
+    const winner = match ? getWinner(match) : null
+    const homeWon = !!winner && winner === match?.home_id
+    const awayWon = !!winner && winner === match?.away_id
 
     return (
         <div className="rounded-xl overflow-hidden border border-white/10">
@@ -83,6 +85,9 @@ function MatchCard({ match, homeLabel, awayLabel, players, isAdmin, onSelectMatc
                 {match?.played ? (
                     <span className="text-white font-bold text-sm w-full text-center">
                         {match.home_score} × {match.away_score}
+                        {penaltiesLabel(match) && (
+                            <span className="text-white/40 text-xs font-normal ml-1">{penaltiesLabel(match)}</span>
+                        )}
                     </span>
                 ) : (
                     <span className="text-white/20 text-xs w-full text-center">vs</span>

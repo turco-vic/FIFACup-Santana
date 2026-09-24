@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { supabase, check } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../contexts/ToastContext'
 import type { Tournament, Profile, TournamentPlayer } from '../types'
@@ -94,7 +94,13 @@ export default function TournamentManage() {
             return
         }
         if (!window.confirm(`Remover ${getPlayerName(playerId)} do campeonato?`)) return
-        await supabase.from('tournament_players').delete().eq('tournament_id', id).eq('player_id', playerId)
+        // .select() revela quando o RLS bloqueia (delete sem erro, mas 0 linhas)
+        const { data, error } = await supabase.from('tournament_players').delete()
+            .eq('tournament_id', id).eq('player_id', playerId).select('id')
+        if (error || !data || data.length === 0) {
+            showToast('Não foi possível remover o jogador.')
+            return
+        }
         setPlayers(prev => prev.filter(p => p.player_id !== playerId))
         showToast('Jogador removido.')
     }
@@ -173,18 +179,19 @@ export default function TournamentManage() {
             return
         }
 
-        // Deletar duplas antigas
-        await supabase.from('duos').delete().eq('tournament_id', id)
-
-        const { data, error } = await supabase.from('duos').insert(
-            valid.map(d => ({
-                tournament_id: id,
-                player1_id: d.p1,
-                player2_id: d.p2,
-            }))
-        ).select()
-
-        if (error) {
+        let data
+        try {
+            // Deletar duplas antigas
+            check(await supabase.from('duos').delete().eq('tournament_id', id))
+            data = check(await supabase.from('duos').insert(
+                valid.map(d => ({
+                    tournament_id: id,
+                    player1_id: d.p1,
+                    player2_id: d.p2,
+                }))
+            ).select()).data
+        } catch (e) {
+            console.error(e)
             showToast('Erro ao salvar duplas.')
             setWorking(false)
             return
@@ -228,12 +235,19 @@ export default function TournamentManage() {
             return
         }
 
-        if (tournament.mode === '2v2') {
-            await generateLeague2v2(savedDuos.map(d => d.id))
-        } else {
-            await supabase.from('matches').delete().eq('tournament_id', id)
-            if (tournament.format === 'groups_knockout') await generateGroups(playerIds)
-            else if (tournament.format === 'league') await generateLeague1v1(playerIds)
+        try {
+            if (tournament.mode === '2v2') {
+                await generateLeague2v2(savedDuos.map(d => d.id))
+            } else {
+                check(await supabase.from('matches').delete().eq('tournament_id', id))
+                if (tournament.format === 'groups_knockout') await generateGroups(playerIds)
+                else if (tournament.format === 'league') await generateLeague1v1(playerIds)
+            }
+        } catch (e) {
+            console.error(e)
+            showToast('Erro ao gerar as partidas. Tente gerar de novo.')
+            setWorking(false)
+            return
         }
 
         showToast('Partidas geradas!')
@@ -241,9 +255,10 @@ export default function TournamentManage() {
         navigate(`/tournament/${id}`)
     }
 
+    // As funções generate* lançam o erro do Supabase; handleGenerateMatches trata
     async function generateLeague2v2(duoIds: string[]) {
         if (!id) return
-        await supabase.from('matches').delete().eq('tournament_id', id)
+        check(await supabase.from('matches').delete().eq('tournament_id', id))
         const matchesToInsert = []
         for (let i = 0; i < duoIds.length; i++) {
             for (let j = i + 1; j < duoIds.length; j++) {
@@ -258,16 +273,16 @@ export default function TournamentManage() {
                 })
             }
         }
-        await supabase.from('matches').insert(matchesToInsert)
+        check(await supabase.from('matches').insert(matchesToInsert))
     }
 
     async function generateGroups(playerIds: string[]) {
         if (!id) return
-        const { data: existingGroups } = await supabase.from('groups').select('id').eq('tournament_id', id)
+        const { data: existingGroups } = check(await supabase.from('groups').select('id').eq('tournament_id', id))
         if (existingGroups && existingGroups.length > 0) {
-            await supabase.from('group_members').delete().in('group_id', existingGroups.map(g => g.id))
+            check(await supabase.from('group_members').delete().in('group_id', existingGroups.map(g => g.id)))
         }
-        await supabase.from('groups').delete().eq('tournament_id', id)
+        check(await supabase.from('groups').delete().eq('tournament_id', id))
 
         const shuffled = [...playerIds].sort(() => Math.random() - 0.5)
         const numGroups = planGroups(shuffled.length)
@@ -277,13 +292,12 @@ export default function TournamentManage() {
         shuffled.forEach((pid, i) => buckets[i % numGroups].push(pid))
 
         for (let g = 0; g < numGroups; g++) {
-            const { data: group } = await supabase
+            const { data: group } = check(await supabase
                 .from('groups').insert({ tournament_id: id, name: `Grupo ${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[g]}` })
-                .select().single()
-            if (!group) continue
+                .select().single())
 
             const groupPlayers = buckets[g]
-            await supabase.from('group_members').insert(groupPlayers.map(pid => ({ group_id: group.id, player_id: pid })))
+            check(await supabase.from('group_members').insert(groupPlayers.map(pid => ({ group_id: group.id, player_id: pid }))))
 
             const matchesToInsert = []
             for (let i = 0; i < groupPlayers.length; i++) {
@@ -295,13 +309,13 @@ export default function TournamentManage() {
                     })
                 }
             }
-            await supabase.from('matches').insert(matchesToInsert)
+            check(await supabase.from('matches').insert(matchesToInsert))
         }
     }
 
     async function generateLeague1v1(playerIds: string[]) {
         if (!id) return
-        await supabase.from('matches').delete().eq('tournament_id', id)
+        check(await supabase.from('matches').delete().eq('tournament_id', id))
         const matchesToInsert = []
         for (let i = 0; i < playerIds.length; i++) {
             for (let j = i + 1; j < playerIds.length; j++) {
@@ -312,20 +326,29 @@ export default function TournamentManage() {
                 })
             }
         }
-        await supabase.from('matches').insert(matchesToInsert)
+        check(await supabase.from('matches').insert(matchesToInsert))
     }
 
     async function handleReset() {
         if (!id) return
         setWorking(true)
-        const { data: existingGroups } = await supabase.from('groups').select('id').eq('tournament_id', id)
-        if (existingGroups && existingGroups.length > 0) {
-            await supabase.from('group_members').delete().in('group_id', existingGroups.map(g => g.id))
+        try {
+            const { data: existingGroups } = check(await supabase.from('groups').select('id').eq('tournament_id', id))
+            if (existingGroups && existingGroups.length > 0) {
+                check(await supabase.from('group_members').delete().in('group_id', existingGroups.map(g => g.id)))
+            }
+            check(await supabase.from('matches').delete().eq('tournament_id', id))
+            check(await supabase.from('groups').delete().eq('tournament_id', id))
+            check(await supabase.from('duos').delete().eq('tournament_id', id))
+            check(await supabase.from('tournaments').update({ status: 'setup' }).eq('id', id))
+        } catch (e) {
+            console.error(e)
+            showToast('Erro ao resetar. Parte dos dados pode já ter sido apagada; tente de novo.')
+            setShowResetConfirm(false)
+            setWorking(false)
+            fetchAll(id)
+            return
         }
-        await supabase.from('matches').delete().eq('tournament_id', id)
-        await supabase.from('groups').delete().eq('tournament_id', id)
-        await supabase.from('duos').delete().eq('tournament_id', id)
-        await supabase.from('tournaments').update({ status: 'setup' }).eq('id', id)
         setTournament(prev => prev ? { ...prev, status: 'setup' } : null)
         setDuos([])
         setSavedDuos([])

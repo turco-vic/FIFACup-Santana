@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { supabase, check } from '../lib/supabase'
+import { getWinner, penaltiesLabel } from '../lib/matches'
+import { formatDate } from '../lib/format'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../contexts/ToastContext'
 import { useStandings } from '../hooks/useStandings'
@@ -147,32 +149,35 @@ export default function TournamentDashboard() {
 
     async function handleGenerateFinal() {
         if (!tournament || !id) return
+        // Mesma ordem da tabela exibida: pontos, saldo, gols pró
+        if (leagueStandings.length < 2) return
         setGeneratingFinal(true)
-        const leagueMatches = matches.filter(m => m.stage === 'league')
-        const entityIds = tournament.mode === '2v2' ? duos.map(d => d.id) : players.map(p => p.id)
-        const standings = entityIds.map(eid => {
-            const pts = leagueMatches.filter(m => m.played).reduce((acc, m) => {
-                if (m.home_id === eid) {
-                    if ((m.home_score ?? 0) > (m.away_score ?? 0)) return acc + 3
-                    if ((m.home_score ?? 0) === (m.away_score ?? 0)) return acc + 1
-                }
-                if (m.away_id === eid) {
-                    if ((m.away_score ?? 0) > (m.home_score ?? 0)) return acc + 3
-                    if ((m.home_score ?? 0) === (m.away_score ?? 0)) return acc + 1
-                }
-                return acc
-            }, 0)
-            return { id: eid, pts }
-        }).sort((a, b) => b.pts - a.pts)
-        if (standings.length < 2) { setGeneratingFinal(false); return }
-        await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', 'final')
-        await supabase.from('matches').insert({
-            tournament_id: id, mode: tournament.mode, stage: 'final',
-            home_id: standings[0].id, away_id: standings[1].id,
-            played: false, match_order: 999,
-        })
-        setGeneratingFinal(false)
-        fetchAll(id)
+        try {
+            check(await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', 'final'))
+            check(await supabase.from('matches').insert({
+                tournament_id: id, mode: tournament.mode, stage: 'final',
+                home_id: leagueStandings[0].id, away_id: leagueStandings[1].id,
+                played: false, match_order: 999,
+            }))
+        } catch (e) {
+            console.error(e)
+            showToast('Erro ao gerar a final. Tente novamente.')
+        } finally {
+            setGeneratingFinal(false)
+            fetchAll(id)
+        }
+    }
+
+    // Jogos de uma fase sem vencedor (empate antigo sem pênaltis) travam o avanço
+    function winnersOrWarn(stageMatches: Match[]): (string | null)[] | null {
+        const winners = stageMatches.map(getWinner)
+        const undecided = stageMatches.filter((_, i) => winners[i] === null)
+        if (undecided.length > 0) {
+            const m = undecided[0]
+            showToast(`${getEntityName(m.home_id)} × ${getEntityName(m.away_id)} está sem vencedor. Edite o resultado e informe os pênaltis.`)
+            return null
+        }
+        return winners
     }
 
     function getGroupStandingsForBracket(group: GroupData) {
@@ -220,101 +225,106 @@ export default function TournamentDashboard() {
                 match_order: koMatches.length, played: false,
             })
         }
-        for (const s of ['round32', 'round16', 'quarters', 'semis', 'final']) {
-            await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', s)
+        try {
+            for (const s of ['round32', 'round16', 'quarters', 'semis', 'final']) {
+                check(await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', s))
+            }
+            check(await supabase.from('matches').insert(koMatches.filter(m => m.home_id && m.away_id)))
+        } catch (e) {
+            console.error(e)
+            showToast('Erro ao gerar o mata-mata. Tente novamente.')
+        } finally {
+            setGeneratingBracket(false)
+            fetchAll(id)
         }
-        const { error } = await supabase.from('matches').insert(koMatches.filter(m => m.home_id && m.away_id))
-        if (error) showToast('Erro ao gerar o mata-mata. Tente novamente.')
-        setGeneratingBracket(false)
-        fetchAll(id)
     }
 
     async function handleAdvanceRound(fromStage: string, toStage: string) {
         if (!tournament || !id) return
-        setGeneratingBracket(true)
         const prev = matches
             .filter(m => m.stage === fromStage)
             .sort((a, b) => (a.match_order ?? 0) - (b.match_order ?? 0))
-        const getWinner = (m: Match): string | null =>
-            m.played && m.home_score !== null && m.away_score !== null
-                ? m.home_score > m.away_score ? m.home_id : m.away_id
-                : null
+        const winners = winnersOrWarn(prev)
+        if (!winners) return
+        setGeneratingBracket(true)
         const next: any[] = []
         // Em blocos de 4 jogos, cruza 0×2 e 1×3 (mesmo critério de handleGenerateSemis):
         // o 1º e o 2º de um mesmo grupo ficam em lados opostos e só podem se reencontrar na final
         for (let b = 0; b + 3 < prev.length; b += 4) {
             for (const [x, y] of [[b, b + 2], [b + 1, b + 3]]) {
-                const wh = getWinner(prev[x]), wa = getWinner(prev[y])
-                if (wh && wa) next.push({
+                next.push({
                     tournament_id: id, mode: tournament.mode, stage: toStage,
-                    home_id: wh, away_id: wa, played: false, match_order: next.length,
+                    home_id: winners[x], away_id: winners[y], played: false, match_order: next.length,
                 })
             }
         }
         const allLater = ['round16', 'quarters', 'semis', 'final']
-        for (const s of allLater.slice(allLater.indexOf(toStage))) {
-            await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', s)
+        try {
+            for (const s of allLater.slice(allLater.indexOf(toStage))) {
+                check(await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', s))
+            }
+            if (next.length > 0) check(await supabase.from('matches').insert(next))
+        } catch (e) {
+            console.error(e)
+            showToast('Erro ao gerar a próxima fase. Tente novamente.')
+        } finally {
+            setGeneratingBracket(false)
+            fetchAll(id)
         }
-        if (next.length > 0) {
-            const { error } = await supabase.from('matches').insert(next)
-            if (error) showToast('Erro ao gerar a próxima fase. Tente novamente.')
-        }
-        setGeneratingBracket(false)
-        fetchAll(id)
     }
 
     async function handleGenerateSemis() {
         if (!tournament || !id) return
-        setGeneratingBracket(true)
         const quarters = matches
             .filter(m => m.stage === 'quarters')
             .sort((a, b) => (a.match_order ?? 0) - (b.match_order ?? 0))
-        const getWinner = (m: Match): string | null =>
-            m.played && m.home_score !== null && m.away_score !== null
-                ? m.home_score > m.away_score ? m.home_id : m.away_id
-                : null
+        const w = winnersOrWarn(quarters)
+        if (!w) return
+        const semi = (home: string | null, away: string | null, order: number) =>
+            ({ tournament_id: id, mode: tournament.mode, stage: 'semis', home_id: home, away_id: away, played: false, match_order: order })
         const semiMatches = []
         if (quarters.length === 4) {
-            const s1h = getWinner(quarters[0]), s1a = getWinner(quarters[2])
-            const s2h = getWinner(quarters[1]), s2a = getWinner(quarters[3])
-            if (s1h && s1a) semiMatches.push({ tournament_id: id, mode: tournament.mode, stage: 'semis', home_id: s1h, away_id: s1a, played: false, match_order: 0 })
-            if (s2h && s2a) semiMatches.push({ tournament_id: id, mode: tournament.mode, stage: 'semis', home_id: s2h, away_id: s2a, played: false, match_order: 1 })
+            semiMatches.push(semi(w[0], w[2], 0), semi(w[1], w[3], 1))
         } else {
-            for (let i = 0; i + 1 < quarters.length; i += 2) {
-                const wh = getWinner(quarters[i]), wa = getWinner(quarters[i + 1])
-                if (wh && wa) semiMatches.push({ tournament_id: id, mode: tournament.mode, stage: 'semis', home_id: wh, away_id: wa, played: false, match_order: i / 2 })
-            }
+            for (let i = 0; i + 1 < quarters.length; i += 2) semiMatches.push(semi(w[i], w[i + 1], i / 2))
         }
-        if (semiMatches.length === 0) { setGeneratingBracket(false); return }
-        await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', 'semis')
-        await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', 'final')
-        const { error } = await supabase.from('matches').insert(semiMatches)
-        if (error) showToast('Erro ao gerar as semifinais. Tente novamente.')
-        setGeneratingBracket(false)
-        fetchAll(id)
+        if (semiMatches.length === 0) return
+        setGeneratingBracket(true)
+        try {
+            check(await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', 'semis'))
+            check(await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', 'final'))
+            check(await supabase.from('matches').insert(semiMatches))
+        } catch (e) {
+            console.error(e)
+            showToast('Erro ao gerar as semifinais. Tente novamente.')
+        } finally {
+            setGeneratingBracket(false)
+            fetchAll(id)
+        }
     }
 
     async function handleGenerateFinalKO() {
         if (!tournament || !id) return
-        setGeneratingBracket(true)
         const semis = matches
             .filter(m => m.stage === 'semis')
             .sort((a, b) => (a.match_order ?? 0) - (b.match_order ?? 0))
-        if (semis.length < 2) { setGeneratingBracket(false); return }
-        const getWinner = (m: Match): string | null =>
-            m.played && m.home_score !== null && m.away_score !== null
-                ? m.home_score > m.away_score ? m.home_id : m.away_id
-                : null
-        const finalHome = getWinner(semis[0]), finalAway = getWinner(semis[1])
-        if (!finalHome || !finalAway) { setGeneratingBracket(false); return }
-        await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', 'final')
-        const { error } = await supabase.from('matches').insert({
-            tournament_id: id, mode: tournament.mode, stage: 'final',
-            home_id: finalHome, away_id: finalAway, played: false, match_order: 999,
-        })
-        if (error) showToast('Erro ao gerar a final. Tente novamente.')
-        setGeneratingBracket(false)
-        fetchAll(id)
+        if (semis.length < 2) return
+        const w = winnersOrWarn(semis)
+        if (!w) return
+        setGeneratingBracket(true)
+        try {
+            check(await supabase.from('matches').delete().eq('tournament_id', id).eq('stage', 'final'))
+            check(await supabase.from('matches').insert({
+                tournament_id: id, mode: tournament.mode, stage: 'final',
+                home_id: w[0], away_id: w[1], played: false, match_order: 999,
+            }))
+        } catch (e) {
+            console.error(e)
+            showToast('Erro ao gerar a final. Tente novamente.')
+        } finally {
+            setGeneratingBracket(false)
+            fetchAll(id)
+        }
     }
 
     function copyCode() {
@@ -334,9 +344,16 @@ export default function TournamentDashboard() {
     const allLeaguePlayed = leagueMatches.length > 0 && leagueMatches.every(m => m.played)
     const standingsProfiles = tournament?.mode === '2v2' ? duosAsProfiles : players
     const leagueStandings = useStandings(standingsProfiles, leagueMatches)
-    const hasChampion = !!finalMatch && finalMatch.played &&
-        finalMatch.home_score !== null && finalMatch.away_score !== null &&
-        finalMatch.home_score !== finalMatch.away_score
+    // Liga pura: campeão é o líder quando todos os jogos acabaram, se não empatar em todos os critérios
+    const leagueTiedAtTop = leagueStandings.length > 1 &&
+        leagueStandings[0].points === leagueStandings[1].points &&
+        leagueStandings[0].goal_diff === leagueStandings[1].goal_diff &&
+        leagueStandings[0].goals_for === leagueStandings[1].goals_for
+    const leagueChampionId = tournament?.format === 'league' && allLeaguePlayed && !leagueTiedAtTop
+        ? leagueStandings[0]?.id ?? null
+        : null
+    const championId = (finalMatch ? getWinner(finalMatch) : null) ?? leagueChampionId
+    const hasChampion = !!championId
 
     const allGroupsPlayed = groupMatches.length > 0 && groupMatches.every(m => m.played)
     const quartersExist = matches.some(m => m.stage === 'quarters')
@@ -428,7 +445,7 @@ export default function TournamentDashboard() {
                 {/* Info */}
                 <div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3 mb-6 flex flex-col gap-2">
                     {tournament.location && <div className="flex items-center gap-2 text-white/50 text-sm"><MapPin size={13} /><span>{tournament.location}</span></div>}
-                    {tournament.date && <div className="flex items-center gap-2 text-white/50 text-sm"><Calendar size={13} /><span>{new Date(tournament.date).toLocaleDateString('pt-BR')}</span></div>}
+                    {tournament.date && <div className="flex items-center gap-2 text-white/50 text-sm"><Calendar size={13} /><span>{formatDate(tournament.date)}</span></div>}
                     {tournament.description && <p className="text-white/40 text-xs mt-1">{tournament.description}</p>}
                     <div className="flex items-center justify-between mt-1 pt-2 border-t border-white/10">
                         <div>
@@ -500,6 +517,15 @@ export default function TournamentDashboard() {
                                                 ))}
                                             </div>
                                         </div>
+                                        {tournament.format === 'league' && allLeaguePlayed && (
+                                            championId
+                                                ? <ChampionCard name={getEntityName(championId)} onCelebrate={() => setShowConfetti(true)} />
+                                                : leagueTiedAtTop && (
+                                                    <p className="px-4 py-3 rounded-xl text-center text-sm text-yellow-400 bg-yellow-400/10 border border-yellow-400/20">
+                                                        Empate na liderança em pontos, saldo e gols pró — sem campeão definido.
+                                                    </p>
+                                                )
+                                        )}
                                         {canEdit && allLeaguePlayed && !finalMatch && tournament.format === 'league_final' && (
                                             <button onClick={handleGenerateFinal} disabled={generatingFinal}
                                                 className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition hover:opacity-90"
@@ -617,22 +643,8 @@ export default function TournamentDashboard() {
                                                 onSelectMatch={(match) => setSelectedMatch(match)}
                                             />
                                         )}
-                                        {hasChampion && finalMatch && (
-                                            <div
-                                                className="px-4 py-4 rounded-xl text-center border"
-                                                style={{ borderColor: 'var(--color-gold)', backgroundColor: 'rgba(201,153,42,0.1)' }}
-                                            >
-                                                <p className="text-white/50 text-xs mb-1">🏆 Campeão do Campeonato</p>
-                                                <p className="font-bold text-xl" style={{ color: 'var(--color-gold)' }}>
-                                                    {finalMatch.home_score! > finalMatch.away_score! ? getEntityName(finalMatch.home_id) : getEntityName(finalMatch.away_id)}
-                                                </p>
-                                                <button
-                                                    onClick={() => setShowConfetti(true)}
-                                                    className="mt-2 text-xs px-3 py-1 rounded-full border border-white/20 text-white/40 hover:text-white hover:border-white/40 transition"
-                                                >
-                                                    🎊 Celebrar novamente
-                                                </button>
-                                            </div>
+                                        {championId && (
+                                            <ChampionCard name={getEntityName(championId)} onCelebrate={() => setShowConfetti(true)} />
                                         )}
                                     </div>
                                 )}
@@ -661,18 +673,9 @@ export default function TournamentDashboard() {
                                         </div>
                                         <div className="px-4 py-4">
                                             <MatchRow match={finalMatch} getEntityName={getEntityName} isAdmin={canEdit} onEdit={() => setSelectedMatch(finalMatch)} />
-                                            {hasChampion && (
-                                                <div className="mt-4 text-center">
-                                                    <p className="text-white/40 text-xs mb-1">🏆 Campeão</p>
-                                                    <p className="font-bold text-lg" style={{ color: 'var(--color-gold)' }}>
-                                                        {finalMatch.home_score! > finalMatch.away_score! ? getEntityName(finalMatch.home_id) : getEntityName(finalMatch.away_id)}
-                                                    </p>
-                                                    <button
-                                                        onClick={() => setShowConfetti(true)}
-                                                        className="mt-2 text-xs px-3 py-1 rounded-full border border-white/20 text-white/40 hover:text-white hover:border-white/40 transition"
-                                                    >
-                                                        🎊 Celebrar novamente
-                                                    </button>
+                                            {championId && (
+                                                <div className="mt-4">
+                                                    <ChampionCard name={getEntityName(championId)} onCelebrate={() => setShowConfetti(true)} />
                                                 </div>
                                             )}
                                         </div>
@@ -924,7 +927,10 @@ function MatchRow({ match, getEntityName, isAdmin, onEdit }: {
             </span>
             <span className="flex-1 text-right text-sm text-white truncate">{getEntityName(match.home_id)}</span>
             {match.played ? (
-                <span className="font-bold text-white px-2 flex-shrink-0">{match.home_score} × {match.away_score}</span>
+                <span className="font-bold text-white px-2 flex-shrink-0 text-center">
+                    {match.home_score} × {match.away_score}
+                    {penaltiesLabel(match) && <span className="block text-white/40 text-xs font-normal">{penaltiesLabel(match)}</span>}
+                </span>
             ) : (
                 <span className="text-white/30 px-2 flex-shrink-0 text-sm flex items-center gap-1"><Clock size={10} />vs</span>
             )}
@@ -934,6 +940,24 @@ function MatchRow({ match, getEntityName, isAdmin, onEdit }: {
                     {match.played ? <Pencil size={12} /> : <Plus size={12} />}
                 </button>
             )}
+        </div>
+    )
+}
+
+function ChampionCard({ name, onCelebrate }: { name: string; onCelebrate: () => void }) {
+    return (
+        <div
+            className="px-4 py-4 rounded-xl text-center border"
+            style={{ borderColor: 'var(--color-gold)', backgroundColor: 'rgba(201,153,42,0.1)' }}
+        >
+            <p className="text-white/50 text-xs mb-1">🏆 Campeão do Campeonato</p>
+            <p className="font-bold text-xl" style={{ color: 'var(--color-gold)' }}>{name}</p>
+            <button
+                onClick={onCelebrate}
+                className="mt-2 text-xs px-3 py-1 rounded-full border border-white/20 text-white/40 hover:text-white hover:border-white/40 transition"
+            >
+                🎊 Celebrar novamente
+            </button>
         </div>
     )
 }

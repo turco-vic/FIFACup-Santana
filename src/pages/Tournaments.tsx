@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { formatDate } from '../lib/format'
 import { useAuth } from '../hooks/useAuth'
 import type { Tournament } from '../types'
 import { Skeleton, SkeletonCard } from '../components/Skeleton'
@@ -176,7 +177,7 @@ function TournamentCard({ tournament: t, onClick }: { tournament: Tournament; on
                 {t.date && (
                     <p className="text-white/30 text-xs flex items-center gap-1 mt-0.5">
                         <Calendar size={10} />
-                        {new Date(t.date).toLocaleDateString('pt-BR')}
+                        {formatDate(t.date)}
                     </p>
                 )}
             </div>

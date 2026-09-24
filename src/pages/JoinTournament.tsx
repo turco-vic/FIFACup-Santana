@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { formatDate } from '../lib/format'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../contexts/ToastContext'
 import { ArrowLeft, Hash, Swords, Handshake } from 'lucide-react'
@@ -172,7 +173,7 @@ export default function JoinTournament() {
                                 <p className="text-white/40 text-xs">📍 {found.location}</p>
                             )}
                             {found.date && (
-                                <p className="text-white/40 text-xs">📅 {new Date(found.date).toLocaleDateString('pt-BR')}</p>
+                                <p className="text-white/40 text-xs">📅 {formatDate(found.date)}</p>
                             )}
                             {found.description && (
                                 <p className="text-white/50 text-sm mt-1">{found.description}</p>
