@@ -81,13 +81,7 @@ export default function CreateTournament() {
             return
         }
 
-        // Criador entra como admin do campeonato
-        await supabase.from('tournament_players').insert({
-            tournament_id: tournament.id,
-            player_id: profile.id,
-            role: 'admin',
-        })
-
+        // O criador vira admin pelo trigger trg_tournament_creator_admin no banco
         showToast(`Campeonato criado! Código: ${invite_code}`)
         navigate(`/tournament/${tournament.id}`)
     }

@@ -67,12 +67,9 @@ export default function ScoreModal({ match, homeName, awayName, onClose }: Props
 
         // --- DISPARO DA NOTIFICAÇÃO PUSH ---
         try {
+            // Título, texto e link são montados no servidor a partir da partida
             await supabase.functions.invoke('send-push-notification', {
-                body: {
-                    title: 'FifaCup: Novo Resultado! ⚽',
-                    body: `${homeName} ${hs} x ${as_} ${awayName}`,
-                    url: `/tournament/${match.tournament_id}` // Link para onde o usuário vai ao clicar
-                }
+                body: { match_id: match.id }
             })
         } catch (pushErr) {
             console.error('Erro ao enviar push:', pushErr)

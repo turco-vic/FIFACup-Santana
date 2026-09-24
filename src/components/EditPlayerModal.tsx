@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
-import type { Profile, Role } from '../types'
+import type { Profile } from '../types'
 import { X, Save } from 'lucide-react'
 import { useToast } from '../contexts/ToastContext'
 
@@ -15,7 +15,6 @@ export default function EditPlayerModal({ player, onClose, onSaved }: Props) {
     const [name, setName] = useState(player.name ?? '')
     const [username, setUsername] = useState(player.username ?? '')
     const [teamName, setTeamName] = useState(player.team_name ?? '')
-    const [role, setRole] = useState<Role>(player.role)
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState('')
 
@@ -34,7 +33,6 @@ export default function EditPlayerModal({ player, onClose, onSaved }: Props) {
                 name: name.trim(),
                 username: username.trim() || null,
                 team_name: teamName.trim() || null,
-                role,
             })
             .eq('id', player.id)
 
@@ -49,7 +47,6 @@ export default function EditPlayerModal({ player, onClose, onSaved }: Props) {
             name: name.trim(),
             username: username.trim() || null,
             team_name: teamName.trim() || null,
-            role,
         }
 
         showToast('Jogador atualizado!')
@@ -111,25 +108,6 @@ export default function EditPlayerModal({ player, onClose, onSaved }: Props) {
                             placeholder="Ex: Flamengo"
                             className="w-full bg-white/10 text-white rounded-xl px-4 py-3 border border-white/20 focus:outline-none focus:border-yellow-500 text-sm"
                         />
-                    </div>
-
-                    <div>
-                        <label className="text-white/50 text-xs mb-1 block">Papel</label>
-                        <div className="flex gap-2">
-                            {(['player', 'admin'] as Role[]).map(r => (
-                                <button
-                                    key={r}
-                                    onClick={() => setRole(r)}
-                                    className="flex-1 py-2.5 rounded-xl text-sm font-bold transition border"
-                                    style={role === r
-                                        ? { backgroundColor: 'var(--color-gold)', color: 'var(--color-green)', borderColor: 'var(--color-gold)' }
-                                        : { backgroundColor: 'transparent', color: 'rgba(255,255,255,0.4)', borderColor: 'rgba(255,255,255,0.15)' }
-                                    }
-                                >
-                                    {r === 'player' ? 'Jogador' : 'Admin'}
-                                </button>
-                            ))}
-                        </div>
                     </div>
 
                     {error && <p className="text-red-400 text-sm text-center">{error}</p>}
