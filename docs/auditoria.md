@@ -79,7 +79,7 @@ Ordem de aplicação:
 - [x] "Turco" fixo removido da Sidebar, Home, Supreme e placeholder do CreateTournament.
   Mantidos de propósito: "Desenvolvido por Turco" e os links de Instagram/LinkedIn na Sidebar.
 
-### Bloco 4.5 — recuperação do legado (um item por vez, revisar cada um)
+### Bloco 4.5 — recuperação do legado (itens 1–4 prontos; revisão item a item)
 Levantamento: comparação dos arquivos removidos na Fase 1 (`10db328^`) com o sistema atual.
 - [x] **1. Regerar fase já gerada** (só front). `src/lib/bracket.ts` planeja o chaveamento:
   compara os confrontos esperados (ranking dos grupos / 2 primeiros da liga / vencedores da fase
@@ -94,7 +94,11 @@ Levantamento: comparação dos arquivos removidos na Fase 1 (`10db328^`) com o s
 - [x] 3. DuoModal (dashboard 2v2): J/V/E/D, gols pró:contra, saldo e pontos na liga via
   `computeStandings` (mesma conta da tabela de onde o modal abre); jogadores com link para
   `/player/:id`; edição do nome mantida; modal rola em telas baixas.
-- [ ] 4. Revisão dos grupos antes de salvar.
+- [x] 4. Revisão dos grupos antes de salvar (Gerenciar, formato grupos + mata-mata):
+  "Sortear grupos" mostra a prévia na tela (nada gravado); "Sortear de novo" refaz;
+  "Confirmar e gerar" grava grupos, membros e partidas (mantém a confirmação quando há
+  resultados). Mostra os grupos atuais quando já existem. Se a lista de jogadores mudar
+  depois do sorteio, pede para sortear de novo. Liga (1v1/2v2) continua com "Gerar / Regerar".
 
 ### Limpeza final
 - [ ] Apagar campeonatos de teste (AAAAAAAAAA, VVVVVVVVVV, hdgeg) e conta de teste.

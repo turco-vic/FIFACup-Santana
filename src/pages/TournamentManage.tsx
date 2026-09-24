@@ -11,6 +11,8 @@ import { Skeleton } from '../components/Skeleton'
 
 type Duo = { p1: string; p2: string }
 
+const groupName = (index: number) => `Grupo ${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[index]}`
+
 // Top 2 de cada grupo avançam: o nº de grupos precisa ser potência de 2 para a chave fechar
 // (2 grupos → semis, 4 → quartas, 8 → oitavas). Retorna null se o nº de jogadores não é suportado.
 function planGroups(playerCount: number): number | null {
@@ -34,6 +36,9 @@ export default function TournamentManage() {
     const [working, setWorking] = useState(false)
     const [showResetConfirm, setShowResetConfirm] = useState(false)
     const [selectingFor, setSelectingFor] = useState<{ duoIndex: number; slot: 1 | 2 } | null>(null)
+    // Grupos + mata-mata: sorteio fica só na tela até o admin confirmar (paridade com as duplas)
+    const [draftGroups, setDraftGroups] = useState<string[][] | null>(null)
+    const [savedGroups, setSavedGroups] = useState<string[][]>([])
 
     useEffect(() => {
         if (authLoading) return
@@ -42,13 +47,18 @@ export default function TournamentManage() {
 
     async function fetchAll(tid: string) {
         setLoading(true)
-        const [{ data: t }, { data: tp }, { data: d }] = await Promise.all([
+        const [{ data: t }, { data: tp }, { data: d }, { data: g }] = await Promise.all([
             supabase.from('tournaments').select('*').eq('id', tid).single(),
             supabase.from('tournament_players')
                 .select('*, profile:player_id(id, name, username, avatar_url, team_name, role, status, created_at)')
                 .eq('tournament_id', tid),
             supabase.from('duos').select('id, player1_id, player2_id').eq('tournament_id', tid),
+            supabase.from('groups').select('id, name').eq('tournament_id', tid).order('name'),
         ])
+        const groupIds = (g ?? []).map(group => group.id)
+        const { data: gm } = groupIds.length > 0
+            ? await supabase.from('group_members').select('group_id, player_id').in('group_id', groupIds)
+            : { data: [] as { group_id: string; player_id: string }[] }
 
         if (!t) { navigate('/'); return }
 
@@ -61,6 +71,8 @@ export default function TournamentManage() {
         setTournament(t)
         setPlayers((tp as any[]) ?? [])
         setSavedDuos(d ?? [])
+        setSavedGroups((g ?? []).map(group =>
+            (gm ?? []).filter(m => m.group_id === group.id).map(m => m.player_id)))
 
         // Se já tem duplas salvas, carrega no estado local
         if (d && d.length > 0) {
@@ -98,6 +110,7 @@ export default function TournamentManage() {
             return
         }
         setPlayers(prev => prev.filter(p => p.player_id !== playerId))
+        setDraftGroups(null)
         showToast('Jogador removido.')
     }
 
@@ -200,6 +213,20 @@ export default function TournamentManage() {
 
     // ---- PARTIDAS ----
 
+    // ---- GRUPOS ----
+
+    function handleDrawGroups() {
+        const numGroups = planGroups(players.length)
+        if (numGroups === null) {
+            showToast('Grupos + mata-mata aceita de 4 a 40 jogadores.')
+            return
+        }
+        // Distribuição round-robin: tamanhos diferem no máximo em 1, nunca há grupo vazio
+        const buckets: string[][] = Array.from({ length: numGroups }, () => [])
+        shuffle(players.map(p => p.player_id)).forEach((pid, i) => buckets[i % numGroups].push(pid))
+        setDraftGroups(buckets)
+    }
+
     async function handleGenerateMatches() {
         if (!tournament || !id) return
         const playerIds = players.map(p => p.player_id)
@@ -216,6 +243,15 @@ export default function TournamentManage() {
         if (tournament.format === 'groups_knockout' && planGroups(playerIds.length) === null) {
             showToast('Grupos + mata-mata aceita de 4 a 40 jogadores.')
             return
+        }
+        if (tournament.format === 'groups_knockout') {
+            // O sorteio na tela precisa ter exatamente os jogadores atuais
+            const drafted = draftGroups?.flat() ?? []
+            if (drafted.length !== playerIds.length || !playerIds.every(pid => drafted.includes(pid))) {
+                setDraftGroups(null)
+                showToast('A lista de jogadores mudou desde o sorteio. Sorteie os grupos de novo.')
+                return
+            }
         }
 
         setWorking(true)
@@ -236,7 +272,7 @@ export default function TournamentManage() {
                 await generateLeague2v2(savedDuos.map(d => d.id))
             } else {
                 check(await supabase.from('matches').delete().eq('tournament_id', id))
-                if (tournament.format === 'groups_knockout') await generateGroups(playerIds)
+                if (tournament.format === 'groups_knockout') await generateGroups(draftGroups!)
                 else if (tournament.format === 'league') await generateLeague1v1(playerIds)
             }
         } catch (e) {
@@ -246,6 +282,7 @@ export default function TournamentManage() {
             return
         }
 
+        setDraftGroups(null)
         showToast('Partidas geradas!')
         setWorking(false)
         navigate(`/tournament/${id}`)
@@ -272,7 +309,8 @@ export default function TournamentManage() {
         check(await supabase.from('matches').insert(matchesToInsert))
     }
 
-    async function generateGroups(playerIds: string[]) {
+    // Grava os grupos do sorteio revisado na tela e as partidas de cada grupo
+    async function generateGroups(buckets: string[][]) {
         if (!id) return
         const { data: existingGroups } = check(await supabase.from('groups').select('id').eq('tournament_id', id))
         if (existingGroups && existingGroups.length > 0) {
@@ -280,16 +318,9 @@ export default function TournamentManage() {
         }
         check(await supabase.from('groups').delete().eq('tournament_id', id))
 
-        const shuffled = shuffle(playerIds)
-        const numGroups = planGroups(shuffled.length)
-        if (numGroups === null) return
-        // Distribuição round-robin: tamanhos diferem no máximo em 1, nunca há grupo vazio
-        const buckets: string[][] = Array.from({ length: numGroups }, () => [])
-        shuffled.forEach((pid, i) => buckets[i % numGroups].push(pid))
-
-        for (let g = 0; g < numGroups; g++) {
+        for (let g = 0; g < buckets.length; g++) {
             const { data: group } = check(await supabase
-                .from('groups').insert({ tournament_id: id, name: `Grupo ${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[g]}` })
+                .from('groups').insert({ tournament_id: id, name: groupName(g) })
                 .select().single())
 
             const groupPlayers = buckets[g]
@@ -348,6 +379,8 @@ export default function TournamentManage() {
         setTournament(prev => prev ? { ...prev, status: 'setup' } : null)
         setDuos([])
         setSavedDuos([])
+        setDraftGroups(null)
+        setSavedGroups([])
         setShowResetConfirm(false)
         setWorking(false)
         showToast('Campeonato resetado.')
@@ -368,6 +401,8 @@ export default function TournamentManage() {
     if (!tournament) return null
 
     const is2v2 = tournament.mode === '2v2'
+    const isGroupsKO = tournament.format === 'groups_knockout'
+    const shownGroups = draftGroups ?? savedGroups
     // Mesma regra do can_edit_tournament no banco: encerrado só o supreme edita
     const locked = tournament.status === 'finished' && !isSupreme
     const allPlayerIds = players.map(p => p.player_id)
@@ -611,15 +646,78 @@ export default function TournamentManage() {
                                 }
                             </p>
                         )}
-                        <button
-                            onClick={handleGenerateMatches}
-                            disabled={working || (is2v2 && savedDuos.length < 2) || (!is2v2 && players.length < 2)}
-                            className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-40"
-                            style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
-                        >
-                            {working ? <RefreshCw size={16} className="animate-spin" /> : <Shuffle size={16} />}
-                            {working ? 'Gerando...' : 'Gerar / Regerar Partidas'}
-                        </button>
+                        {/* Grupos + mata-mata: sortear → revisar na tela → confirmar e gravar */}
+                        {isGroupsKO && shownGroups.length > 0 && (
+                            <div>
+                                <p className="text-xs font-bold uppercase tracking-wider mb-2"
+                                    style={{ color: draftGroups ? 'var(--color-gold)' : 'rgba(255,255,255,0.4)' }}>
+                                    {draftGroups ? 'Prévia do sorteio — ainda não gravado' : 'Grupos atuais'}
+                                </p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {shownGroups.map((group, i) => (
+                                        <div key={i} className="rounded-lg border px-3 py-2"
+                                            style={draftGroups
+                                                ? { borderColor: 'rgba(201,153,42,0.4)', backgroundColor: 'rgba(201,153,42,0.08)' }
+                                                : { borderColor: 'rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.03)' }}>
+                                            <p className="text-xs font-bold mb-1" style={{ color: 'var(--color-gold)' }}>{groupName(i)}</p>
+                                            {group.map(pid => (
+                                                <p key={pid} className="text-white text-xs truncate py-0.5">{getPlayerName(pid)}</p>
+                                            ))}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {isGroupsKO && (draftGroups ? (
+                            <>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={handleDrawGroups}
+                                        disabled={working}
+                                        className="flex-1 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 border border-white/20 text-white/70 hover:text-white transition disabled:opacity-40"
+                                    >
+                                        <Shuffle size={14} /> Sortear de novo
+                                    </button>
+                                    <button
+                                        onClick={handleGenerateMatches}
+                                        disabled={working}
+                                        className="flex-1 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-40"
+                                        style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
+                                    >
+                                        {working ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} />}
+                                        {working ? 'Gerando...' : 'Confirmar e gerar'}
+                                    </button>
+                                </div>
+                                <p className="text-white/30 text-xs text-center">
+                                    {savedGroups.length > 0
+                                        ? 'Confirmar substitui os grupos atuais e apaga as partidas já geradas.'
+                                        : 'Nada é gravado até você confirmar.'}
+                                </p>
+                            </>
+                        ) : (
+                            <button
+                                onClick={handleDrawGroups}
+                                disabled={working || planGroups(players.length) === null}
+                                className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-40"
+                                style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
+                            >
+                                <Shuffle size={16} />
+                                {savedGroups.length > 0 ? 'Sortear novos grupos' : 'Sortear grupos'}
+                            </button>
+                        ))}
+
+                        {!isGroupsKO && (
+                            <button
+                                onClick={handleGenerateMatches}
+                                disabled={working || (is2v2 && savedDuos.length < 2) || (!is2v2 && players.length < 2)}
+                                className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-40"
+                                style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
+                            >
+                                {working ? <RefreshCw size={16} className="animate-spin" /> : <Shuffle size={16} />}
+                                {working ? 'Gerando...' : 'Gerar / Regerar Partidas'}
+                            </button>
+                        )}
                     </div>
                 </div>
 
