@@ -106,7 +106,14 @@ Levantamento: comparação dos arquivos removidos na Fase 1 (`10db328^`) com o s
   (`src/lib/groupDraft.ts`). Nada é gravado antes de confirmar.
 
 ### Limpeza final
-- [ ] Apagar campeonatos de teste (AAAAAAAAAA, VVVVVVVVVV, hdgeg) e conta de teste.
+- [ ] **L1** — Apagar dados de teste: campeonatos AAAAAAAAAA, VVVVVVVVVV, hdgeg; conta 8f592300
+  (teste123@teste.com); 11 contas Ghost 01–11 (id `aaaaaaaa-…`, e-mail @fake.com).
+  Scripts em `supabase/scripts/` (não são migrations): `..._1_conferir.sql` (só leitura, uma consulta
+  por vez) e `..._2_apagar.sql` (transação única). Aborta se não achar exatamente 3 campeonatos e
+  12 contas, se alguma conta do conjunto tiver e-mail real, ou se alguma conta de teste tiver
+  partida/dupla/grupo/autoria em campeonato real. Contas reais inscritas nos campeonatos de teste
+  só perdem a inscrição. Testado em PGlite (FKs sem cascade): caminho feliz + 7 cenários de aborto.
+  Avatares das contas de teste: apagar pelo Storage depois.
 - [ ] `.gitignore` do `supabase/.temp` e do `schema.sql`.
 - [ ] `lang="pt-BR"`, favicon.
 - [ ] Lint zerado.
