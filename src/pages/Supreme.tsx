@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { useNavigate } from 'react-router-dom'
@@ -10,6 +10,11 @@ import {
 } from 'lucide-react'
 import { Skeleton } from '../components/Skeleton'
 import EditPlayerModal from '../components/EditPlayerModal'
+import Button from '../components/ui/Button'
+import Badge from '../components/ui/Badge'
+import Avatar from '../components/ui/Avatar'
+import { Card, CardBody } from '../components/ui/Card'
+import { cx } from '../lib/cx'
 
 export default function Supreme() {
     const { profile, signOut } = useAuth()
@@ -71,16 +76,14 @@ export default function Supreme() {
 
     if (loading) {
         return (
-            <div className="min-h-screen p-6">
+            <div className="px-4 pt-4 pb-6 sm:px-6">
                 <div className="max-w-2xl mx-auto flex flex-col gap-4">
                     <Skeleton className="h-8 w-48" />
                     <Skeleton className="h-4 w-32" />
-                    {[...Array(3)].map((_, i) => (
-                        <div key={i} className="p-4 rounded-xl bg-white/5 border border-white/10">
-                            <Skeleton className="h-5 w-40 mb-3" />
-                            <Skeleton className="h-12 w-full" />
-                        </div>
-                    ))}
+                    <div className="grid grid-cols-3 gap-3">
+                        {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-20 rounded-card" />)}
+                    </div>
+                    {[...Array(2)].map((_, i) => <Skeleton key={i} className="h-32 w-full rounded-card" />)}
                 </div>
             </div>
         )
@@ -93,94 +96,72 @@ export default function Supreme() {
     const displayName = profile.username ?? profile.name?.split(' ')[0] ?? 'Supreme'
 
     return (
-        <div className="min-h-screen p-6">
-            <div className="max-w-2xl mx-auto">
+        <div className="px-4 pt-4 pb-6 sm:px-6">
+            <div className="max-w-2xl mx-auto flex flex-col gap-5">
 
-                {/* Header */}
-                <div className="flex items-center justify-between mb-2">
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <Shield size={18} style={{ color: 'var(--color-gold)' }} />
-                            <h1 className="text-2xl font-bold" style={{ color: 'var(--color-gold)' }}>
-                                AdminSupremo
-                            </h1>
-                        </div>
-                        <p className="text-white/40 text-sm mt-0.5">Olá, {displayName}</p>
+                <header className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                        <h1 className="flex items-center gap-2 font-display font-bold text-headline uppercase tracking-wide text-brand-text">
+                            <Shield size={22} className="text-brand" aria-hidden />
+                            AdminSupremo
+                        </h1>
+                        <p className="text-body text-muted mt-0.5">Olá, {displayName}</p>
                     </div>
-                    <button
-                        onClick={handleSignOut}
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg text-white border border-white/20 hover:bg-white/10 transition text-sm"
-                    >
-                        <LogOut size={14} />
-                        Sair
-                    </button>
-                </div>
+                    <Button variant="secondary" size="sm" icon={<LogOut size={15} />} onClick={handleSignOut}>Sair</Button>
+                </header>
 
-                {/* Cards resumo */}
-                <div className="grid grid-cols-3 gap-3 mb-6 mt-6">
-                    <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
-                        <p className="text-white text-2xl font-bold">{pending.length}</p>
-                        <p className="text-white/40 text-xs mt-1">Pendentes</p>
-                    </div>
-                    <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
-                        <p className="text-white text-2xl font-bold">{active.length}</p>
-                        <p className="text-white/40 text-xs mt-1">Ativos</p>
-                    </div>
-                    <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
-                        <p className="text-white text-2xl font-bold">{blocked.length}</p>
-                        <p className="text-white/40 text-xs mt-1">Bloqueados</p>
-                    </div>
+                {/* Resumo */}
+                <div className="grid grid-cols-3 gap-3">
+                    {[
+                        { label: 'Pendentes', value: pending.length, color: pending.length > 0 ? 'text-warning' : 'text-primary' },
+                        { label: 'Ativos', value: active.length, color: 'text-primary' },
+                        { label: 'Bloqueados', value: blocked.length, color: blocked.length > 0 ? 'text-danger' : 'text-primary' },
+                    ].map(({ label, value, color }) => (
+                        <Card key={label}>
+                            <CardBody className="px-2 py-4 text-center">
+                                <p className={cx('font-display font-bold text-display tabular-nums leading-none', color)}>{value}</p>
+                                <p className="text-caption text-muted mt-1.5">{label}</p>
+                            </CardBody>
+                        </Card>
+                    ))}
                 </div>
 
                 {/* Contas pendentes */}
-                <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden mb-4">
-                    <button
-                        onClick={() => setExpandedSection(expandedSection === 'pending' ? null : 'pending')}
-                        className="w-full flex items-center justify-between px-4 py-3 border-b border-white/10"
-                        style={{ backgroundColor: pending.length > 0 ? 'rgba(234,179,8,0.1)' : 'rgba(201,153,42,0.05)' }}
-                    >
-                        <div className="flex items-center gap-2">
-                            <Clock size={14} className={pending.length > 0 ? 'text-yellow-400' : 'text-white/30'} />
-                            <h2 className="font-bold text-sm" style={{ color: pending.length > 0 ? '#facc15' : 'rgba(255,255,255,0.4)' }}>
-                                Aguardando aprovação
-                            </h2>
-                            {pending.length > 0 && (
-                                <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-yellow-400/20 text-yellow-400">
-                                    {pending.length}
-                                </span>
-                            )}
-                        </div>
-                        {expandedSection === 'pending' ? <ChevronUp size={14} className="text-white/40" /> : <ChevronDown size={14} className="text-white/40" />}
-                    </button>
-
+                <Card className={pending.length > 0 ? 'border-warning-border' : undefined}>
+                    <SectionToggle
+                        open={expandedSection === 'pending'}
+                        onToggle={() => setExpandedSection(expandedSection === 'pending' ? null : 'pending')}
+                        icon={<Clock size={18} className={pending.length > 0 ? 'text-warning' : 'text-muted'} />}
+                        title="Aguardando aprovação"
+                        highlight={pending.length > 0}
+                        badge={pending.length > 0 && <Badge tone="warning">{pending.length}</Badge>}
+                    />
                     {expandedSection === 'pending' && (
-                        <div className="flex flex-col">
+                        <div>
                             {pending.length === 0 ? (
-                                <p className="text-white/30 text-sm text-center py-6">Nenhuma conta pendente</p>
+                                <p className="text-body text-muted text-center py-6">Nenhuma conta pendente</p>
                             ) : pending.map(p => (
-                                <div key={p.id} className="flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0">
-                                    <div className="w-8 h-8 rounded-full bg-white/10 flex-shrink-0 flex items-center justify-center border border-white/20">
-                                        <span className="text-white/40 text-sm font-bold">{p.name?.charAt(0) ?? '?'}</span>
-                                    </div>
+                                <div key={p.id} className="flex flex-wrap items-center gap-3 px-card py-3 border-b border-subtle last:border-0">
+                                    <Avatar name={p.name} size="md" />
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-white text-sm font-medium truncate">{p.name ?? 'Sem nome'}</p>
-                                        <p className="text-white/30 text-xs truncate">{new Date(p.created_at).toLocaleDateString('pt-BR')}</p>
+                                        <p className="text-body font-semibold text-primary truncate">{p.name ?? 'Sem nome'}</p>
+                                        <p className="text-caption text-muted truncate">{new Date(p.created_at).toLocaleDateString('pt-BR')}</p>
                                     </div>
                                     <div className="flex gap-2 flex-shrink-0">
                                         <button
+                                            type="button"
                                             onClick={() => handleApprove(p)}
-                                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition"
-                                            style={{ backgroundColor: 'rgba(34,197,94,0.15)', color: 'rgb(74,222,128)' }}
+                                            className="h-10 px-3 flex items-center gap-1.5 rounded-control border border-success-border bg-success-subtle text-success text-body font-semibold hover:brightness-110 transition"
                                         >
-                                            <CheckCircle size={12} />
+                                            <CheckCircle size={16} aria-hidden />
                                             Aprovar
                                         </button>
                                         <button
+                                            type="button"
                                             onClick={() => handleBlock(p)}
-                                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition"
-                                            style={{ backgroundColor: 'rgba(239,68,68,0.15)', color: 'rgb(248,113,113)' }}
+                                            className="h-10 px-3 flex items-center gap-1.5 rounded-control border border-danger-border bg-danger-subtle text-danger text-body font-semibold hover:brightness-110 transition"
                                         >
-                                            <XCircle size={12} />
+                                            <XCircle size={16} aria-hidden />
                                             Recusar
                                         </button>
                                     </div>
@@ -188,105 +169,79 @@ export default function Supreme() {
                             ))}
                         </div>
                     )}
-                </div>
+                </Card>
 
                 {/* Usuários ativos */}
-                <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden mb-4">
-                    <button
-                        onClick={() => setExpandedSection(expandedSection === 'active' ? null : 'active')}
-                        className="w-full flex items-center justify-between px-4 py-3 border-b border-white/10"
-                        style={{ backgroundColor: 'rgba(201,153,42,0.05)' }}
-                    >
-                        <div className="flex items-center gap-2">
-                            <Users size={14} style={{ color: 'var(--color-gold)' }} />
-                            <h2 className="font-bold text-sm" style={{ color: 'var(--color-gold)' }}>
-                                Usuários ativos
-                            </h2>
-                            <span className="text-xs px-2 py-0.5 rounded-full font-bold"
-                                style={{ backgroundColor: 'rgba(201,153,42,0.2)', color: 'var(--color-gold)' }}>
-                                {active.length}
-                            </span>
-                        </div>
-                        {expandedSection === 'active' ? <ChevronUp size={14} className="text-white/40" /> : <ChevronDown size={14} className="text-white/40" />}
-                    </button>
-
+                <Card>
+                    <SectionToggle
+                        open={expandedSection === 'active'}
+                        onToggle={() => setExpandedSection(expandedSection === 'active' ? null : 'active')}
+                        icon={<Users size={18} className="text-brand" />}
+                        title="Usuários ativos"
+                        badge={<Badge tone="brand">{active.length}</Badge>}
+                    />
                     {expandedSection === 'active' && (
-                        <div className="flex flex-col">
+                        <div>
                             {active.length === 0 ? (
-                                <p className="text-white/30 text-sm text-center py-6">Nenhum usuário ativo</p>
+                                <p className="text-body text-muted text-center py-6">Nenhum usuário ativo</p>
                             ) : active.map(p => (
-                                <div key={p.id} className="flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0">
-                                    <div
-                                        className="w-8 h-8 rounded-full overflow-hidden bg-white/10 flex-shrink-0 flex items-center justify-center border"
-                                        style={{ borderColor: 'var(--color-gold)' }}
-                                    >
-                                        {p.avatar_url
-                                            ? <img src={p.avatar_url} alt="" className="w-full h-full object-cover" />
-                                            : <span className="text-white/40 text-sm font-bold">{p.name?.charAt(0) ?? '?'}</span>
-                                        }
-                                    </div>
+                                <div key={p.id} className="flex items-center gap-3 px-card py-3 min-h-16 border-b border-subtle last:border-0">
+                                    <Avatar src={p.avatar_url} name={p.name} size="md" />
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-white text-sm font-medium truncate">{p.name ?? 'Sem nome'}</p>
-                                        <div className="flex items-center gap-2">
-                                            {p.username && <span className="text-white/40 text-xs">@{p.username}</span>}
-                                            {p.team_name && (
-                                                <span className="text-xs px-1.5 py-0.5 rounded"
-                                                    style={{ backgroundColor: 'rgba(201,153,42,0.15)', color: 'var(--color-gold)' }}>
-                                                    {p.team_name}
-                                                </span>
-                                            )}
+                                        <p className="text-body font-semibold text-primary truncate">{p.name ?? 'Sem nome'}</p>
+                                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5">
+                                            {p.username && <span className="text-caption text-muted">@{p.username}</span>}
+                                            {p.team_name && <Badge tone="brand">{p.team_name}</Badge>}
                                         </div>
                                     </div>
                                     <div className="flex gap-2 flex-shrink-0">
                                         <button
+                                            type="button"
                                             onClick={() => setEditingPlayer(p)}
-                                            className="p-1.5 rounded border border-white/20 text-white/40 hover:text-white hover:border-white/40 transition"
+                                            aria-label={`Editar ${p.name ?? 'usuário'}`}
+                                            className="h-10 w-10 flex items-center justify-center rounded-control border border-default text-secondary hover:text-primary hover:bg-fill-strong transition-colors"
                                         >
-                                            <Pencil size={13} />
+                                            <Pencil size={16} />
                                         </button>
                                         <button
+                                            type="button"
                                             onClick={() => handleBlock(p)}
-                                            className="p-1.5 rounded border border-red-500/30 text-red-400/60 hover:text-red-400 hover:border-red-500/60 transition"
+                                            aria-label={`Bloquear ${p.name ?? 'usuário'}`}
+                                            className="h-10 w-10 flex items-center justify-center rounded-control border border-danger-border text-danger hover:bg-danger-subtle transition-colors"
                                         >
-                                            <XCircle size={13} />
+                                            <XCircle size={16} />
                                         </button>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     )}
-                </div>
+                </Card>
 
                 {/* Usuários bloqueados */}
                 {blocked.length > 0 && (
-                    <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden mb-6">
-                        <div className="px-4 py-3 border-b border-white/10"
-                            style={{ backgroundColor: 'rgba(239,68,68,0.05)' }}>
-                            <div className="flex items-center gap-2">
-                                <XCircle size={14} className="text-red-400/60" />
-                                <h2 className="font-bold text-sm text-red-400/60">Bloqueados</h2>
-                            </div>
+                    <Card className="border-danger-border">
+                        <div className="flex items-center gap-2 px-card py-3 bg-danger-subtle border-b border-danger-border">
+                            <XCircle size={18} className="text-danger" aria-hidden />
+                            <h2 className="font-display font-bold text-title uppercase tracking-wide text-danger">Bloqueados</h2>
+                            <Badge tone="danger">{blocked.length}</Badge>
                         </div>
-                        <div className="flex flex-col">
+                        <div>
                             {blocked.map(p => (
-                                <div key={p.id} className="flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0">
-                                    <div className="w-8 h-8 rounded-full bg-white/5 flex-shrink-0 flex items-center justify-center border border-red-500/20">
-                                        <span className="text-red-400/40 text-sm font-bold">{p.name?.charAt(0) ?? '?'}</span>
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-white/40 text-sm font-medium truncate">{p.name ?? 'Sem nome'}</p>
-                                    </div>
+                                <div key={p.id} className="flex items-center gap-3 px-card py-3 border-b border-subtle last:border-0">
+                                    <Avatar name={p.name} size="md" className="opacity-60" />
+                                    <p className="flex-1 min-w-0 text-body text-muted truncate">{p.name ?? 'Sem nome'}</p>
                                     <button
+                                        type="button"
                                         onClick={() => handleBlock(p)}
-                                        className="text-xs px-3 py-1.5 rounded-lg font-bold transition"
-                                        style={{ backgroundColor: 'rgba(34,197,94,0.1)', color: 'rgb(74,222,128)' }}
+                                        className="h-10 px-3 rounded-control border border-success-border bg-success-subtle text-success text-body font-semibold hover:brightness-110 transition flex-shrink-0"
                                     >
                                         Desbloquear
                                     </button>
                                 </div>
                             ))}
                         </div>
-                    </div>
+                    </Card>
                 )}
 
             </div>
@@ -299,5 +254,40 @@ export default function Supreme() {
                 />
             )}
         </div>
+    )
+}
+
+// Cabeçalho de seção que abre e fecha (lista de pendentes / ativos)
+function SectionToggle({ open, onToggle, icon, title, badge, highlight = false }: {
+    open: boolean
+    onToggle: () => void
+    icon: ReactNode
+    title: string
+    badge?: ReactNode
+    highlight?: boolean
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={open}
+            className={cx(
+                'w-full flex items-center justify-between gap-3 px-card min-h-14 text-left transition-colors hover:bg-surface-hover',
+                open && 'border-b border-subtle',
+                highlight ? 'bg-warning-subtle' : 'bg-brand-subtle',
+            )}
+        >
+            <span className="flex items-center gap-2 min-w-0">
+                {icon}
+                <span className={cx(
+                    'font-display font-bold text-title uppercase tracking-wide truncate',
+                    highlight ? 'text-warning' : 'text-brand-text',
+                )}>
+                    {title}
+                </span>
+                {badge}
+            </span>
+            {open ? <ChevronUp size={18} className="text-muted flex-shrink-0" /> : <ChevronDown size={18} className="text-muted flex-shrink-0" />}
+        </button>
     )
 }

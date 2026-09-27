@@ -3,7 +3,14 @@ import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { Skeleton } from '../components/Skeleton'
 import { usePushNotifications } from '../hooks/usePushNotifications'
-import { Eye, EyeOff } from 'lucide-react'
+import { Bell, BellOff, Camera, KeyRound, LogOut } from 'lucide-react'
+import Button from '../components/ui/Button'
+import Input from '../components/ui/Input'
+import Alert from '../components/ui/Alert'
+import Avatar from '../components/ui/Avatar'
+import PasswordToggle from '../components/ui/PasswordToggle'
+import { Card, CardBody, CardHeader } from '../components/ui/Card'
+import { buttonClasses } from '../components/ui/variants'
 
 export default function Profile() {
     const { profile, loading, signOut, isSupreme } = useAuth()
@@ -77,25 +84,18 @@ export default function Profile() {
 
     if (loading) {
         return (
-            <div className="min-h-screen p-6">
-                <div className="max-w-md mx-auto">
-                    <div className="flex items-center justify-between mb-8">
-                        <Skeleton className="h-8 w-32" />
-                        <Skeleton className="h-9 w-16" />
+            <div className="px-4 pt-4 pb-6 sm:px-6">
+                <div className="max-w-md mx-auto flex flex-col gap-5">
+                    <div className="flex items-center justify-between">
+                        <Skeleton className="h-8 w-40" />
+                        <Skeleton className="h-9 w-20" />
                     </div>
-                    <div className="flex flex-col items-center mb-8">
-                        <Skeleton className="w-24 h-24 rounded-full mb-3" />
-                        <Skeleton className="h-5 w-32 mb-2" />
-                        <Skeleton className="h-9 w-28" />
+                    <div className="flex flex-col items-center gap-3">
+                        <Skeleton className="w-24 h-24 rounded-full" />
+                        <Skeleton className="h-6 w-36" />
+                        <Skeleton className="h-9 w-32" />
                     </div>
-                    <div className="flex flex-col gap-4">
-                        {[...Array(3)].map((_, i) => (
-                            <div key={i}>
-                                <Skeleton className="h-3 w-24 mb-1" />
-                                <Skeleton className="h-12 w-full rounded-lg" />
-                            </div>
-                        ))}
-                    </div>
+                    <Skeleton className="h-48 w-full rounded-card" />
                 </div>
             </div>
         )
@@ -103,153 +103,118 @@ export default function Profile() {
 
     if (!profile) {
         return (
-            <div className="min-h-screen flex items-center justify-center">
-                <p className="text-white">Você precisa estar logado.</p>
+            <div className="px-4 pt-10 text-center">
+                <p className="text-body-lg text-secondary">Você precisa estar logado.</p>
             </div>
         )
     }
 
     return (
-        <div className="min-h-screen p-6">
-            <div className="max-w-md mx-auto">
+        <div className="px-4 pt-4 pb-6 sm:px-6">
+            <div className="max-w-md mx-auto flex flex-col gap-5">
 
-                <div className="flex items-center justify-between mb-8">
-                    <h1 className="text-2xl font-bold" style={{ color: 'var(--color-gold)' }}>
-                        Meu Perfil
-                    </h1>
-                    <button
-                        onClick={signOut}
-                        className="px-4 py-2 rounded-lg text-white border border-white/30 hover:bg-white/10 transition text-sm"
-                    >
-                        Sair
-                    </button>
-                </div>
+                <header className="flex items-center justify-between gap-3">
+                    <h1 className="font-display font-bold text-headline uppercase tracking-wide text-brand-text">Meu perfil</h1>
+                    <Button variant="secondary" size="sm" icon={<LogOut size={15} />} onClick={signOut}>Sair</Button>
+                </header>
 
-                {/* Avatar */}
-                <div className="flex flex-col items-center mb-8">
-                    <div
-                        className="w-24 h-24 rounded-full overflow-hidden bg-white/10 border-2 mb-3"
-                        style={{ borderColor: 'var(--color-gold)' }}
-                    >
-                        {avatarUrl ? (
-                            <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center text-3xl text-white/30">?</div>
-                        )}
-                    </div>
-                    <p className="text-white font-bold text-lg">{name || 'Sem nome'}</p>
-                    {!isSupreme && username && <p className="text-white/50 text-sm">@{username}</p>}
-                    <label className="cursor-pointer text-sm px-4 py-2 rounded-lg border border-white/30 text-white hover:bg-white/10 transition mt-3">
+                {/* Foto e nome */}
+                <div className="flex flex-col items-center text-center gap-1">
+                    <Avatar src={avatarUrl} name={name} size="xl" className="mb-2 shadow-lg" />
+                    <p className="font-display font-bold text-headline uppercase tracking-wide">{name || 'Sem nome'}</p>
+                    {!isSupreme && username && <p className="text-body text-muted">@{username}</p>}
+                    <label className={buttonClasses({ variant: 'secondary', size: 'sm', className: 'mt-3 cursor-pointer' })}>
+                        <Camera size={15} aria-hidden />
                         {uploading ? 'Enviando...' : 'Trocar foto'}
-                        <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+                        <input type="file" accept="image/*" className="sr-only" onChange={handleAvatarUpload} />
                     </label>
                 </div>
 
                 {/* Dados */}
-                <div className="flex flex-col gap-4 mb-6">
-                    <div>
-                        <label className="text-white/60 text-sm mb-1 block">Nome completo</label>
-                        <div className="w-full px-4 py-3 rounded-lg bg-white/5 text-white/50 border border-white/10">
-                            {name || 'Não definido'}
+                <Card>
+                    <CardHeader title="Dados" />
+                    <CardBody className="flex flex-col gap-4">
+                        <div className="flex flex-col gap-1.5">
+                            <span className="text-caption font-semibold text-secondary">Nome completo</span>
+                            <div className="h-11 px-3.5 flex items-center rounded-card bg-fill border border-subtle text-body-lg sm:text-body text-muted">
+                                {name || 'Não definido'}
+                            </div>
                         </div>
-                    </div>
 
-                    {!isSupreme && (
-                        <>
-                            <div>
-                                <label className="text-white/60 text-sm mb-1 block">Username</label>
-                                <input
+                        {!isSupreme && (
+                            <>
+                                <Input
+                                    label="Username"
                                     type="text"
                                     value={username}
                                     onChange={e => setUsername(e.target.value)}
                                     placeholder="Seu apelido"
                                     autoComplete="off"
-                                    className="w-full px-4 py-3 rounded-lg bg-white/10 text-white placeholder-white/40 border border-white/20 focus:outline-none focus:border-yellow-500"
+                                    autoCapitalize="none"
+                                    icon={<span className="text-body-lg">@</span>}
                                 />
-                            </div>
-                            <div>
-                                <label className="text-white/60 text-sm mb-1 block">Time do FIFA</label>
-                                <input
+                                <Input
+                                    label="Time do FIFA"
                                     type="text"
                                     value={teamName}
                                     onChange={e => setTeamName(e.target.value)}
                                     placeholder="Ex: Real Madrid"
-                                    className="w-full px-4 py-3 rounded-lg bg-white/10 text-white placeholder-white/40 border border-white/20 focus:outline-none focus:border-yellow-500"
                                 />
-                            </div>
-                        </>
-                    )}
+                            </>
+                        )}
 
-                    {message && (
-                        <p className={`text-sm ${message.includes('Erro') ? 'text-red-400' : 'text-green-400'}`}>
-                            {message}
-                        </p>
-                    )}
+                        {message && (
+                            <Alert tone={message.includes('Erro') ? 'danger' : 'success'}>{message}</Alert>
+                        )}
 
-                    {!isSupreme && (
-                        <button
-                            onClick={handleSaveProfile}
-                            disabled={saving}
-                            className="w-full py-3 rounded-lg font-bold text-white transition"
-                            style={{ backgroundColor: 'var(--color-gold)' }}
-                        >
-                            {saving ? 'Salvando...' : 'Salvar perfil'}
-                        </button>
-                    )}
-                </div>
+                        {!isSupreme && (
+                            <Button fullWidth onClick={handleSaveProfile} loading={saving}>
+                                {saving ? 'Salvando...' : 'Salvar perfil'}
+                            </Button>
+                        )}
+                    </CardBody>
+                </Card>
 
                 {/* Notificações */}
-                <div className="border-t border-white/10 pt-6 mb-6">
-                    <h2 className="text-white font-bold mb-1">Notificações</h2>
-                    <p className="text-white/50 text-sm mb-4">Receba alertas de resultados em tempo real.</p>
-                    <button
-                        onClick={isSubscribed ? unsubscribe : subscribe}
-                        disabled={loadingPush}
-                        className="w-full py-3 rounded-lg font-bold transition border"
-                        style={isSubscribed
-                            ? { borderColor: 'var(--color-gold)', color: 'var(--color-gold)', background: 'transparent' }
-                            : { backgroundColor: 'var(--color-gold)', color: 'white', border: 'none' }
-                        }
-                    >
-                        {loadingPush ? 'Aguarde...' : isSubscribed ? '🔔 Notificações ativadas - clique para desativar' : '🔕 Ativar notificações'}
-                    </button>
-                </div>
+                <Card>
+                    <CardHeader title="Notificações" />
+                    <CardBody className="flex flex-col gap-3">
+                        <p className="text-body text-secondary">Receba alertas de resultados em tempo real.</p>
+                        <Button
+                            fullWidth
+                            variant={isSubscribed ? 'secondary' : 'primary'}
+                            icon={isSubscribed ? <Bell size={16} className="text-success" /> : <BellOff size={16} />}
+                            onClick={isSubscribed ? unsubscribe : subscribe}
+                            disabled={loadingPush}
+                            className="whitespace-normal text-center min-h-11 h-auto py-2"
+                        >
+                            {loadingPush ? 'Aguarde...' : isSubscribed ? 'Notificações ativadas - clique para desativar' : 'Ativar notificações'}
+                        </Button>
+                    </CardBody>
+                </Card>
 
                 {/* Trocar senha */}
-                <div className="border-t border-white/10 pt-6">
-                    <h2 className="text-white font-bold mb-4">Trocar senha</h2>
-                    <div className="flex flex-col gap-4">
-                        <div className="relative">
-                            <input
-                                type={showPassword ? 'text' : 'password'}
-                                value={newPassword}
-                                onChange={e => setNewPassword(e.target.value)}
-                                placeholder="Nova senha"
-                                autoComplete="new-password"
-                                className="w-full px-4 py-3 pr-12 rounded-lg bg-white/10 text-white placeholder-white/40 border border-white/20 focus:outline-none focus:border-yellow-500"
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition"
-                            >
-                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                            </button>
-                        </div>
+                <Card>
+                    <CardHeader title="Trocar senha" />
+                    <CardBody className="flex flex-col gap-4">
+                        <Input
+                            aria-label="Nova senha"
+                            type={showPassword ? 'text' : 'password'}
+                            value={newPassword}
+                            onChange={e => setNewPassword(e.target.value)}
+                            placeholder="Nova senha"
+                            autoComplete="new-password"
+                            hint="Mínimo de 6 caracteres."
+                            trailing={<PasswordToggle visible={showPassword} onToggle={() => setShowPassword(!showPassword)} />}
+                        />
                         {passwordMessage && (
-                            <p className={`text-sm ${passwordMessage.includes('Erro') ? 'text-red-400' : 'text-green-400'}`}>
-                                {passwordMessage}
-                            </p>
+                            <Alert tone={passwordMessage.includes('Erro') ? 'danger' : 'success'}>{passwordMessage}</Alert>
                         )}
-                        <button
-                            onClick={handleChangePassword}
-                            disabled={savingPassword}
-                            className="w-full py-3 rounded-lg font-bold text-white transition border border-white/30 hover:bg-white/10"
-                        >
+                        <Button variant="secondary" fullWidth icon={<KeyRound size={16} />} onClick={handleChangePassword} loading={savingPassword}>
                             {savingPassword ? 'Atualizando...' : 'Atualizar senha'}
-                        </button>
-                    </div>
-                </div>
+                        </Button>
+                    </CardBody>
+                </Card>
 
             </div>
         </div>

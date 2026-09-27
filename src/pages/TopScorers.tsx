@@ -5,6 +5,10 @@ import { useAuth } from '../hooks/useAuth'
 import type { Profile, Tournament } from '../types'
 import { Trophy } from 'lucide-react'
 import { Skeleton, SkeletonCard } from '../components/Skeleton'
+import Avatar from '../components/ui/Avatar'
+import Select from '../components/ui/Select'
+import { Card, CardBody } from '../components/ui/Card'
+import { cx } from '../lib/cx'
 
 type PlayerGoals = Profile & { total_goals: number }
 type TournamentOption = Pick<Tournament, 'id' | 'name' | 'status'>
@@ -82,11 +86,12 @@ export default function TopScorers() {
 
     if (loading) {
         return (
-            <div className="min-h-screen p-6">
+            <div className="px-4 pt-4 pb-6 sm:px-6">
                 <div className="max-w-2xl mx-auto">
-                    <Skeleton className="h-8 w-40 mb-6" />
+                    <Skeleton className="h-8 w-48 mb-4" />
+                    <Skeleton className="h-11 w-full mb-6 rounded-card" />
                     <div className="flex flex-col gap-2">
-                        {[...Array(8)].map((_, i) => <SkeletonCard key={i} />)}
+                        {[...Array(6)].map((_, i) => <SkeletonCard key={i} />)}
                     </div>
                 </div>
             </div>
@@ -94,78 +99,80 @@ export default function TopScorers() {
     }
 
     return (
-        <div className="min-h-screen p-6">
-            <div className="max-w-2xl mx-auto">
+        <div className="px-4 pt-4 pb-6 sm:px-6">
+            <div className="max-w-2xl mx-auto flex flex-col gap-5">
 
-                <h1 className="text-2xl font-bold mb-4" style={{ color: 'var(--color-gold)' }}>
+                <h1 className="font-display font-bold text-headline uppercase tracking-wide text-brand-text">
                     Artilheiros | 1v1
                 </h1>
 
                 {tournaments.length > 0 && (
-                    <select
+                    <Select
+                        label="Campeonato"
                         value={selectedId ?? ''}
                         onChange={e => setSearchParams({ t: e.target.value })}
-                        aria-label="Campeonato"
-                        className="w-full mb-6 px-4 py-3 rounded-xl bg-white/10 text-white border border-white/20 focus:outline-none focus:border-yellow-500 text-sm"
                     >
                         {tournaments.map(t => (
-                            <option key={t.id} value={t.id} style={{ backgroundColor: '#081f16' }}>{t.name}</option>
+                            <option key={t.id} value={t.id}>{t.name}</option>
                         ))}
-                    </select>
+                    </Select>
                 )}
 
                 {tournaments.length === 0 ? (
-                    <p className="text-white/40 text-center mt-12">
-                        Você não está em nenhum campeonato 1v1.
-                    </p>
+                    <Card>
+                        <CardBody className="flex flex-col items-center text-center gap-2 py-10">
+                            <Trophy size={36} className="text-faint" aria-hidden />
+                            <p className="text-body text-muted">Você não está em nenhum campeonato 1v1.</p>
+                        </CardBody>
+                    </Card>
                 ) : loadingGoals ? (
                     <div className="flex flex-col gap-2">
                         {[...Array(4)].map((_, i) => <SkeletonCard key={i} />)}
                     </div>
                 ) : players.length === 0 ? (
-                    <p className="text-white/40 text-center mt-12">
-                        Nenhum gol registrado neste campeonato.
-                    </p>
+                    <Card>
+                        <CardBody className="flex flex-col items-center text-center gap-2 py-10">
+                            <Trophy size={36} className="text-faint" aria-hidden />
+                            <p className="text-body text-muted">Nenhum gol registrado neste campeonato.</p>
+                        </CardBody>
+                    </Card>
                 ) : (
                     <div className="flex flex-col gap-2">
                         {players.map((player, i) => (
                             <Link
                                 key={player.id}
                                 to={`/player/${player.id}`}
-                                className="flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition"
+                                className={cx(
+                                    'flex items-center gap-3 p-3 pr-4 rounded-card border transition-colors',
+                                    i === 0
+                                        ? 'bg-brand-subtle border-accent shadow-brand hover:bg-brand-muted'
+                                        : 'bg-surface border-subtle hover:bg-surface-hover',
+                                )}
                             >
-                                <div className="w-8 text-center flex-shrink-0">
+                                <div className="w-8 flex justify-center flex-shrink-0">
                                     {i === 0 ? (
-                                        <Trophy size={20} style={{ color: 'var(--color-gold)' }} />
+                                        <Trophy size={22} className="text-brand" aria-label="1º lugar" />
                                     ) : (
-                                        <span className="text-white/40 font-bold text-sm">{i + 1}</span>
+                                        <span className="font-display font-bold text-title tabular-nums text-muted">{i + 1}</span>
                                     )}
                                 </div>
 
-                                <div
-                                    className="w-10 h-10 rounded-full overflow-hidden bg-white/10 flex-shrink-0 flex items-center justify-center font-bold border"
-                                    style={{ borderColor: i === 0 ? 'var(--color-gold)' : 'transparent' }}
-                                >
-                                    {player.avatar_url
-                                        ? <img src={player.avatar_url} alt="" className="w-full h-full object-cover" />
-                                        : <span className="text-white/40">{player.name?.charAt(0)}</span>
-                                    }
-                                </div>
+                                <Avatar src={player.avatar_url} name={player.username ?? player.name} size="md" />
 
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-white font-bold truncate">
+                                    <p className={cx('truncate', i === 0 ? 'font-display font-bold text-title uppercase tracking-wide text-brand-text' : 'text-body-lg font-semibold text-primary')}>
                                         {player.username ?? player.name}
                                     </p>
                                     {player.team_name && (
-                                        <p className="text-white/40 text-xs truncate">{player.team_name}</p>
+                                        <p className="text-caption text-muted truncate">{player.team_name}</p>
                                     )}
                                 </div>
 
                                 <div className="flex-shrink-0 text-right">
-                                    <p className="text-2xl font-bold" style={{ color: 'var(--color-gold)' }}>
+                                    <p className={cx('font-display font-bold text-display tabular-nums leading-none', i === 0 ? 'text-brand-text' : 'text-primary')}>
                                         {player.total_goals}
                                     </p>
-                                    <p className="text-white/30 text-xs">
+                                    <p className="text-caption text-muted">
                                         {player.total_goals === 1 ? 'gol' : 'gols'}
                                     </p>
                                 </div>

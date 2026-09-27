@@ -1,10 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { computeStandings } from '../lib/standings'
 import type { Profile, Match, Standing } from '../types'
 import { ArrowLeft, Trophy, Swords, Shield } from 'lucide-react'
 import { Skeleton } from '../components/Skeleton'
+import Button from '../components/ui/Button'
+import Badge from '../components/ui/Badge'
+import Avatar from '../components/ui/Avatar'
+import { Card, CardBody } from '../components/ui/Card'
+import { cx } from '../lib/cx'
 
 type PlayerStats = Standing & { total_goals: number }
 
@@ -50,15 +55,13 @@ export default function PlayerProfile() {
 
   if (loading) {
     return (
-      <div className="min-h-screen p-6">
-        <div className="max-w-sm mx-auto">
-          <Skeleton className="h-9 w-20 mb-6" />
-          <div className="flex flex-col items-center">
-            <Skeleton className="w-28 h-28 rounded-full mb-4" />
-            <Skeleton className="h-6 w-40 mb-2" />
-            <Skeleton className="h-4 w-24 mb-4" />
-            <Skeleton className="h-9 w-32 rounded-full" />
-          </div>
+      <div className="px-4 pt-4 pb-6 sm:px-6">
+        <div className="max-w-sm mx-auto flex flex-col items-center gap-3">
+          <Skeleton className="h-10 w-24 self-start mb-2" />
+          <Skeleton className="w-28 h-28 rounded-full" />
+          <Skeleton className="h-7 w-40" />
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-40 w-full rounded-card mt-4" />
         </div>
       </div>
     )
@@ -66,133 +69,84 @@ export default function PlayerProfile() {
 
   if (!player) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-white/40">Jogador não encontrado.</p>
+      <div className="px-4 pt-10 text-center">
+        <p className="text-body-lg text-muted">Jogador não encontrado.</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen p-6">
-      <div className="max-w-sm mx-auto">
+    <div className="px-4 pt-4 pb-6 sm:px-6">
+      <div className="max-w-sm mx-auto flex flex-col gap-5">
 
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-2 text-white/40 hover:text-white transition mb-6 text-sm"
-        >
-          <ArrowLeft size={16} />
+        <Button variant="ghost" size="sm" className="self-start -ml-2" icon={<ArrowLeft size={18} />} onClick={() => navigate(-1)}>
           Voltar
-        </button>
+        </Button>
 
-        {/* Avatar e info */}
-        <div className="flex flex-col items-center text-center mb-8">
-          <div
-            className="w-28 h-28 rounded-full overflow-hidden bg-white/10 border-2 mb-4"
-            style={{ borderColor: 'var(--color-gold)' }}
-          >
-            {player.avatar_url ? (
-              <img src={player.avatar_url} alt={player.name ?? ''} className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-4xl font-bold text-white/20">
-                {player.name?.charAt(0) ?? '?'}
-              </div>
-            )}
-          </div>
-
-          <h1 className="text-white font-bold text-xl mb-1">
+        {/* Foto e info */}
+        <div className="flex flex-col items-center text-center gap-1">
+          <Avatar src={player.avatar_url} name={player.name} size="2xl" className="mb-3 shadow-lg" />
+          <h1 className="font-display font-bold text-display uppercase leading-none break-words max-w-full">
             {player.name ?? 'Sem nome'}
           </h1>
-
           {player.username && (
-            <p className="text-white/40 text-sm mb-3">@{player.username}</p>
+            <p className="text-body text-muted">@{player.username}</p>
           )}
-
           {player.team_name && (
-            <div
-              className="px-4 py-1.5 rounded-full font-bold text-sm"
-              style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
-            >
-              ⚽ {player.team_name}
-            </div>
+            <Badge tone="brand" size="md" className="mt-2">⚽ {player.team_name}</Badge>
           )}
         </div>
 
         {/* Estatísticas */}
         {stats && stats.played > 0 && (
-          <div className="flex flex-col gap-4">
-            <h2 className="text-white/40 text-xs uppercase tracking-wider">Estatísticas</h2>
+          <div className="flex flex-col gap-3">
+            <h2 className="text-label uppercase text-muted">Estatísticas</h2>
 
-            {/* Cards de stats */}
             <div className="grid grid-cols-3 gap-3">
-              <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
-                <p className="text-2xl font-bold text-green-400">{stats.wins}</p>
-                <p className="text-white/40 text-xs mt-1">Vitórias</p>
-              </div>
-              <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
-                <p className="text-2xl font-bold text-white/60">{stats.draws}</p>
-                <p className="text-white/40 text-xs mt-1">Empates</p>
-              </div>
-              <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
-                <p className="text-2xl font-bold text-red-400">{stats.losses}</p>
-                <p className="text-white/40 text-xs mt-1">Derrotas</p>
-              </div>
+              <StatTile value={stats.wins} label="Vitórias" color="text-success" />
+              <StatTile value={stats.draws} label="Empates" color="text-secondary" />
+              <StatTile value={stats.losses} label="Derrotas" color="text-danger" />
             </div>
 
-            {/* Pontos e aproveitamento */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
-                <p className="text-2xl font-bold" style={{ color: 'var(--color-gold)' }}>{stats.points}</p>
-                <p className="text-white/40 text-xs mt-1">Pontos</p>
-              </div>
-              <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
-                <p className="text-2xl font-bold text-white">
-                  {Math.round((stats.wins / stats.played) * 100)}%
-                </p>
-                <p className="text-white/40 text-xs mt-1">Aproveitamento</p>
-              </div>
+              <StatTile value={stats.points} label="Pontos" color="text-brand-text" />
+              <StatTile value={`${Math.round((stats.wins / stats.played) * 100)}%`} label="Aproveitamento" />
             </div>
 
-            {/* Gols */}
             <div className="grid grid-cols-3 gap-3">
-              <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
-                <div className="flex justify-center mb-1">
-                  <Swords size={14} style={{ color: 'var(--color-gold)' }} />
-                </div>
-                <p className="text-xl font-bold text-white">{stats.goals_for}</p>
-                <p className="text-white/40 text-xs mt-1">Marcados</p>
-              </div>
-              <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
-                <div className="flex justify-center mb-1">
-                  <Shield size={14} style={{ color: 'var(--color-gold)' }} />
-                </div>
-                <p className="text-xl font-bold text-white">{stats.goals_against}</p>
-                <p className="text-white/40 text-xs mt-1">Sofridos</p>
-              </div>
-              <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
-                <div className="flex justify-center mb-1">
-                  <Trophy size={14} style={{ color: 'var(--color-gold)' }} />
-                </div>
-                <p className="text-xl font-bold text-white">{stats.total_goals}</p>
-                <p className="text-white/40 text-xs mt-1">Gols totais</p>
-              </div>
+              <StatTile value={stats.goals_for} label="Marcados" icon={<Swords size={14} />} />
+              <StatTile value={stats.goals_against} label="Sofridos" icon={<Shield size={14} />} />
+              <StatTile value={stats.total_goals} label="Gols totais" icon={<Trophy size={14} />} />
             </div>
 
-            {/* Partidas jogadas */}
-            <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
-              <p className="text-xl font-bold text-white">{stats.played}</p>
-              <p className="text-white/40 text-xs mt-1">Partidas jogadas</p>
-            </div>
-
+            <StatTile value={stats.played} label="Partidas jogadas" />
           </div>
         )}
 
         {stats && stats.played === 0 && (
-          <p className="text-white/30 text-center text-sm">
+          <p className="text-body text-muted text-center">
             Nenhuma partida jogada ainda.
           </p>
         )}
 
       </div>
     </div>
+  )
+}
+
+function StatTile({ value, label, color = 'text-primary', icon }: {
+  value: number | string
+  label: string
+  color?: string
+  icon?: ReactNode
+}) {
+  return (
+    <Card>
+      <CardBody className="px-2 py-3.5 text-center">
+        {icon && <div className="flex justify-center mb-1 text-brand">{icon}</div>}
+        <p className={cx('font-display font-bold text-headline tabular-nums leading-none', color)}>{value}</p>
+        <p className="text-caption text-muted mt-1">{label}</p>
+      </CardBody>
+    </Card>
   )
 }

@@ -11,7 +11,8 @@ type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> & {
     // Algo à direita dentro do campo (botão de mostrar senha, unidade)
     trailing?: ReactNode
     // score: número grande centralizado na fonte de placar (lançar resultado, pênaltis)
-    variant?: 'default' | 'score'
+    // code: código de convite grande e espaçado
+    variant?: 'default' | 'score' | 'code'
     containerClassName?: string
 }
 
@@ -45,8 +46,10 @@ export default function Input({
                         'w-full rounded-card bg-fill-strong border text-primary',
                         variant === 'score'
                             ? 'h-16 text-center font-display font-bold text-4xl tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
-                            // 16px no celular: abaixo disso o Safari do iPhone dá zoom ao focar o campo
-                            : 'h-11 text-body-lg sm:text-body',
+                            : variant === 'code'
+                                ? 'h-14 font-display font-bold text-headline uppercase tracking-[0.3em] placeholder:normal-case placeholder:tracking-normal placeholder:font-sans placeholder:font-normal placeholder:text-body-lg'
+                                // 16px no celular: abaixo disso o Safari do iPhone dá zoom ao focar o campo
+                                : 'h-11 text-body-lg sm:text-body',
                         'placeholder:text-muted transition-colors duration-150',
                         'focus:outline-none focus:ring-2',
                         error

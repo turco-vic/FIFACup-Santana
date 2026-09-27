@@ -4,6 +4,9 @@ const SIZE = {
     xs: 'w-6 h-6 text-caption',
     sm: 'w-8 h-8 text-body',
     md: 'w-10 h-10 text-body-lg',
+    lg: 'w-12 h-12 text-title',
+    xl: 'w-24 h-24 text-display border-2',
+    '2xl': 'w-28 h-28 text-display border-2',
 }
 
 // Foto do jogador ou a inicial do nome, com anel dourado

@@ -42,6 +42,20 @@ export function buttonClasses({ variant = 'primary', size = 'md', fullWidth = fa
     )
 }
 
+// Campo de formulário (Textarea, Select): mesma borda, foco e erro do Input.
+// 16px no celular para o Safari do iPhone não dar zoom ao focar.
+export function fieldClasses({ error = false, className }: { error?: boolean; className?: string } = {}): string {
+    return cx(
+        'w-full rounded-card bg-fill-strong border text-primary text-body-lg sm:text-body',
+        'placeholder:text-muted transition-colors duration-150 focus:outline-none focus:ring-2',
+        error
+            ? 'border-danger-border focus:border-danger focus:ring-danger/30'
+            : 'border-default hover:border-strong focus:border-focus focus:ring-focus/30',
+        'disabled:opacity-50 disabled:cursor-not-allowed',
+        className,
+    )
+}
+
 export type BadgeTone = 'neutral' | 'brand' | 'success' | 'danger' | 'warning' | 'info'
 
 export const BADGE_TONE: Record<BadgeTone, string> = {

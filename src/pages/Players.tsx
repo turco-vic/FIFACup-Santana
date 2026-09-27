@@ -4,6 +4,18 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import type { Profile } from '../types'
 import { Skeleton, SkeletonCard } from '../components/Skeleton'
+import { ChevronRight } from 'lucide-react'
+import Badge from '../components/ui/Badge'
+import Avatar from '../components/ui/Avatar'
+import type { BadgeTone } from '../components/ui/variants'
+
+// Selo de situação (só o supreme vê): supreme / pendente / bloqueado / ativo
+function statusBadge(player: Profile): { tone: BadgeTone; label: string } {
+    if (player.role === 'supreme') return { tone: 'brand', label: 'Supreme' }
+    if (player.status === 'pending') return { tone: 'warning', label: 'Pendente' }
+    if (player.status === 'blocked') return { tone: 'danger', label: 'Bloqueado' }
+    return { tone: 'success', label: 'Ativo' }
+}
 
 export default function Players() {
     const { isSupreme } = useAuth()
@@ -32,9 +44,9 @@ export default function Players() {
 
     if (loading) {
         return (
-            <div className="min-h-screen p-6">
+            <div className="px-4 pt-4 pb-6 sm:px-6">
                 <div className="max-w-2xl mx-auto">
-                    <Skeleton className="h-8 w-40 mb-6" />
+                    <Skeleton className="h-8 w-48 mb-6" />
                     <div className="flex flex-col gap-3">
                         {[...Array(8)].map((_, i) => <SkeletonCard key={i} />)}
                     </div>
@@ -44,68 +56,39 @@ export default function Players() {
     }
 
     return (
-        <div className="min-h-screen p-6">
-            <div className="max-w-2xl mx-auto">
+        <div className="px-4 pt-4 pb-6 sm:px-6">
+            <div className="max-w-2xl mx-auto flex flex-col gap-5">
 
-                <h1 className="text-2xl font-bold mb-6" style={{ color: 'var(--color-gold)' }}>
-                    {isSupreme ? 'Todos os usuários' : 'Participantes'}
-                </h1>
+                <header className="flex items-center justify-between gap-3">
+                    <h1 className="font-display font-bold text-headline uppercase tracking-wide text-brand-text">
+                        {isSupreme ? 'Todos os usuários' : 'Participantes'}
+                    </h1>
+                    <Badge size="md">{players.length} usuário{players.length !== 1 ? 's' : ''}</Badge>
+                </header>
 
-                <div className="flex flex-col gap-3">
-                    {players.map(player => (
-                        <Link
-                            key={player.id}
-                            to={`/player/${player.id}`}
-                            className="flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition"
-                        >
-                            <div
-                                className="w-12 h-12 rounded-full overflow-hidden bg-white/10 border-2 flex-shrink-0"
-                                style={{ borderColor: 'var(--color-gold)' }}
+                <div className="flex flex-col gap-2">
+                    {players.map(player => {
+                        const status = statusBadge(player)
+                        return (
+                            <Link
+                                key={player.id}
+                                to={`/player/${player.id}`}
+                                className="group flex items-center gap-3 p-3 pr-2 rounded-card bg-surface border border-subtle hover:bg-surface-hover transition-colors"
                             >
-                                {player.avatar_url ? (
-                                    <img src={player.avatar_url} alt={player.name ?? ''} className="w-full h-full object-cover" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-white/30 font-bold text-lg">
-                                        {player.name?.charAt(0) ?? '?'}
+                                <Avatar src={player.avatar_url} name={player.name} size="lg" />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-body-lg font-semibold text-primary truncate">{player.name ?? 'Sem nome'}</p>
+                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5">
+                                        {player.username && <span className="text-caption text-muted">@{player.username}</span>}
+                                        {isSupreme && <Badge tone={status.tone}>{status.label}</Badge>}
+                                        {player.team_name && <Badge tone="brand">{player.team_name}</Badge>}
                                     </div>
-                                )}
-                            </div>
-
-                            <div className="flex-1 min-w-0">
-                                <p className="text-white font-bold truncate">{player.name ?? 'Sem nome'}</p>
-                                <div className="flex items-center gap-2">
-                                    {player.username && (
-                                        <p className="text-white/40 text-sm">@{player.username}</p>
-                                    )}
-                                    {isSupreme && (
-                                        <span className={`text-xs px-1.5 py-0.5 rounded font-bold ${player.status === 'pending' ? 'bg-yellow-400/20 text-yellow-400' :
-                                                player.status === 'blocked' ? 'bg-red-500/20 text-red-400' :
-                                                    player.role === 'supreme' ? 'bg-purple-500/20 text-purple-400' :
-                                                        'bg-green-500/20 text-green-400'
-                                            }`}>
-                                            {player.role === 'supreme' ? 'Supreme' :
-                                                player.status === 'pending' ? 'Pendente' :
-                                                    player.status === 'blocked' ? 'Bloqueado' : 'Ativo'}
-                                        </span>
-                                    )}
                                 </div>
-                            </div>
-
-                            {player.team_name && (
-                                <div
-                                    className="text-xs font-bold px-3 py-1 rounded-full flex-shrink-0"
-                                    style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
-                                >
-                                    {player.team_name}
-                                </div>
-                            )}
-                        </Link>
-                    ))}
+                                <ChevronRight size={20} className="text-muted flex-shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                            </Link>
+                        )
+                    })}
                 </div>
-
-                <p className="text-white/30 text-sm text-center mt-6">
-                    {players.length} usuário{players.length !== 1 ? 's' : ''}
-                </p>
 
             </div>
         </div>
