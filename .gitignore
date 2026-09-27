@@ -22,4 +22,9 @@ yarn-error.log*
 # OS
 .DS_Store
 Thumbs.db
-"schema.sql" 
+
+# Dump local do banco (repo público)
+schema.sql
+
+# Estado local do Supabase CLI
+supabase/.temp/

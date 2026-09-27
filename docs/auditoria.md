@@ -106,18 +106,17 @@ Levantamento: comparação dos arquivos removidos na Fase 1 (`10db328^`) com o s
   (`src/lib/groupDraft.ts`). Nada é gravado antes de confirmar.
 
 ### Limpeza final
-- [ ] **L1** — Apagar dados de teste: campeonatos AAAAAAAAAA, VVVVVVVVVV, hdgeg; conta 8f592300
-  (teste123@teste.com); 11 contas Ghost 01–11 (id `aaaaaaaa-…`, e-mail @fake.com).
-  Scripts em `supabase/scripts/` (não são migrations): `..._1_conferir.sql` (só leitura, uma consulta
-  por vez) e `..._2_apagar.sql` (transação única). Aborta se não achar exatamente 3 campeonatos e
-  12 contas, se alguma conta do conjunto tiver e-mail real, ou se alguma conta de teste tiver
-  partida/dupla/grupo/autoria em campeonato real. Contas reais inscritas nos campeonatos de teste
-  só perdem a inscrição. Testado em PGlite (FKs sem cascade): caminho feliz + 7 cenários de aborto.
-  Avatares das contas de teste: apagar pelo Storage depois.
-- [ ] `.gitignore` do `supabase/.temp` e do `schema.sql`.
-- [ ] `lang="pt-BR"`, favicon.
+- [x] **L1** aplicado pelo usuário.
+- [x] **L2** — repositório e build:
+  - `.gitignore`: a linha `"schema.sql"` (com aspas) não funcionava; agora `schema.sql` e
+    `supabase/.temp/`. Os arquivos de `.temp` já versionados saem com `git rm -r --cached supabase/.temp`.
+  - `index.html` com `lang="pt-BR"`.
+  - Favicon: o `favicon.ico` era cópia do `logo.png` (500×500, 222 KB) declarada como SVG. Gerados
+    `favicon.ico` (16/32/48), `apple-touch-icon.png` (180), `icon-192.png` e `icon-512.png`; o manifest
+    aponta para eles. O `sw.js` já usava `/icon-192.png` nas notificações (antes o arquivo não existia).
+  - `recharts` removido (sem uso; já não entrava no bundle).
+  - Bundle: ~565 kB é o tamanho real (react-dom 175 kB, Supabase ~180 kB, app ~142 kB). Os 232 kB
+    eram builds sem `.env`: `supabase.ts` lança erro sem as variáveis, o Vite as troca por constantes
+    e o minificador descarta o app inteiro. `vite.config.ts` agora faz o build falhar sem
+    `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`. Opcional: dividir por rota (lazy) para sair do aviso > 500 kB.
 - [ ] Lint zerado.
-- [ ] Remover `recharts` do `package.json`.
-- [ ] Bundle JS com ~565 kB (aviso de chunk > 500 kB do Vite). Em 24/09 o build do HEAD (4.3)
-  já dava esse tamanho, antes de o 4.4 entrar; builds anteriores na mesma sessão mostraram 232 kB.
-  Investigar a causa (analisar o bundle).
