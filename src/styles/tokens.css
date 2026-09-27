@@ -1,0 +1,177 @@
+/* =====================================================================
+   FIFACup Santana — design tokens (D1)
+
+   Tudo deriva das duas cores do logo:
+     verde  #0D5C4A  (antigo --color-green)
+     dourado #C9992A (antigo --color-gold)
+
+   Tema escuro por natureza (fundo verde); não há light mode.
+
+   Como usar (Tailwind v4 gera os utilitários a partir do @theme):
+     fundos   bg-deep  bg-canvas  bg-surface  bg-surface-hover  bg-elevated  bg-fill  bg-fill-strong  bg-overlay
+     texto    text-primary  text-secondary  text-muted  text-faint  text-on-brand  text-brand-text
+     bordas   border-subtle  border-default  border-strong  border-accent
+     marca    bg-brand  hover:bg-brand-hover  bg-brand-subtle  bg-brand-muted  (text-/border- também)
+     estados  text-success  bg-success-subtle  border-success-border  (idem danger, warning, info)
+              bg-danger-solid  (botão destrutivo, texto branco)
+     foco     ring-focus  outline-focus  (e :focus-visible global abaixo)
+     raio     rounded-control  rounded-card  rounded-sheet  (+ rounded-full do Tailwind)
+     sombra   shadow-sm  shadow-md  shadow-lg  shadow-xl  shadow-brand
+     tipo     text-display  text-headline  text-title  text-body-lg  text-body  text-caption  text-label
+     espaço   p-gutter  p-card  gap-gutter ...
+
+   Contraste (WCAG) medido sobre bg-surface (card), onde fica a maior parte do texto.
+   ===================================================================== */
+
+@theme static {
+  /* ---------------------------------------------------------------
+     Superfícies — escala do verde, do mais fundo ao mais alto
+     (surface/hover/elevated = branco 5% / 10% / 8% sobre o canvas,
+     os mesmos tons que as telas já usam com bg-white/5 e bg-white/10)
+     --------------------------------------------------------------- */
+  --background-color-deep: #081F16;           /* sidebar, bottom nav, zonas de perigo */
+  --background-color-canvas: #0D5C4A;         /* fundo da página (verde do logo) */
+  --background-color-surface: #196453;        /* card */
+  --background-color-surface-hover: #256C5C;  /* card/linha em hover ou pressionado */
+  --background-color-elevated: #206958;       /* modal, popover, sheet (usar com shadow) */
+  --background-color-fill: rgb(255 255 255 / 0.05);        /* camada dentro de outra superfície */
+  --background-color-fill-strong: rgb(255 255 255 / 0.10); /* input, chip, hover dentro de card */
+  --background-color-overlay: rgb(3 20 15 / 0.75);         /* fundo atrás do modal (verde, não preto puro) */
+
+  /* ---------------------------------------------------------------
+     Marca — dourado
+     --------------------------------------------------------------- */
+  --color-brand: #C9992A;          /* preenchimento: botão principal, destaque, troféu */
+  --color-brand-hover: #D1A84A;    /* dourado + 15% de branco */
+  --color-brand-active: #B18725;   /* dourado 12% mais escuro */
+  --color-brand-subtle: rgb(201 153 42 / 0.10);  /* fundo de cabeçalho de card, linha destacada */
+  --color-brand-muted: rgb(201 153 42 / 0.20);   /* badge, chip selecionado */
+
+  /* ---------------------------------------------------------------
+     Texto — o branco com opacidade de hoje, nomeado e ajustado para contraste
+     (branco/40, o mais usado hoje, dá 2,6:1 — abaixo do mínimo de 4,5:1)
+     --------------------------------------------------------------- */
+  --text-color-primary: #FFFFFF;    /* 7,0:1 — títulos, valores, texto principal */
+  --text-color-secondary: #E7F0ED;  /* 6,0:1 — texto de apoio (substitui white/60–70) */
+  --text-color-muted: #C0D5CE;      /* 4,6:1 — legenda, metadado, rótulo (substitui white/30–50) */
+  --text-color-faint: #6E9D92;      /* 2,3:1 — SÓ decorativo: ícone de estado vazio, desabilitado */
+  --text-color-on-brand: #081F16;   /* texto sobre o dourado: 6,6:1 (o verde de hoje dá 3,05:1) */
+  --text-color-brand-text: #EBCC84; /* dourado como texto (títulos de card): 4,5:1; o #C9992A dá 2,7:1 */
+
+  /* ---------------------------------------------------------------
+     Bordas
+     --------------------------------------------------------------- */
+  --border-color-subtle: rgb(255 255 255 / 0.08);   /* divisória entre linhas, borda de card */
+  --border-color-default: rgb(255 255 255 / 0.16);  /* input, botão secundário */
+  --border-color-strong: rgb(255 255 255 / 0.32);   /* hover de input/botão */
+  --border-color-accent: rgb(201 153 42 / 0.45);    /* destaque dourado (card selecionado, campeão) */
+
+  /* ---------------------------------------------------------------
+     Semânticos — matizes saturados e clareados até 4,5:1 sobre o card,
+     com a mesma luminosidade entre si (nenhum "grita" mais que o outro)
+     --------------------------------------------------------------- */
+  --color-success: #6EE5AE;
+  --color-success-subtle: rgb(110 229 174 / 0.12);
+  --color-success-border: rgb(110 229 174 / 0.35);
+
+  --color-danger: #FFC0BB;
+  --color-danger-subtle: rgb(255 120 110 / 0.14);
+  --color-danger-border: rgb(255 120 110 / 0.40);
+  --color-danger-solid: #C93A2F;        /* botão destrutivo; texto branco 5,1:1 */
+  --color-danger-solid-hover: #B3322A;
+
+  --color-warning: #FFC395;             /* laranja-pêssego: afastado do dourado da marca (26° × 42°) */
+  --color-warning-subtle: rgb(255 170 100 / 0.12);
+  --color-warning-border: rgb(255 170 100 / 0.38);
+
+  --color-info: #8ED9FF;
+  --color-info-subtle: rgb(142 217 255 / 0.12);
+  --color-info-border: rgb(142 217 255 / 0.35);
+
+  /* ---------------------------------------------------------------
+     Foco — anel dourado claro (5,1:1 sobre o canvas), afastado 2px do elemento
+     --------------------------------------------------------------- */
+  --color-focus: #F0CD7A;
+
+  /* ---------------------------------------------------------------
+     Raio — nomes por uso para não colidir com a escala do Tailwind
+     (redefinir rounded-sm/md/lg mudaria 55 elementos que usam rounded-lg hoje)
+       sm   → control (8px)   badge, chip, botão pequeno   (= rounded-lg de hoje)
+       md   → card    (12px)  card, botão, input           (= rounded-xl de hoje)
+       lg   → sheet   (16px)  modal, bottom sheet           (= rounded-2xl de hoje)
+       full → rounded-full do Tailwind (avatar, pill)
+     --------------------------------------------------------------- */
+  --radius-control: 0.5rem;
+  --radius-card: 0.75rem;
+  --radius-sheet: 1rem;
+
+  /* ---------------------------------------------------------------
+     Sombra — para fundo escuro: preto com mais opacidade que o padrão do
+     Tailwind (0,1), senão some no verde. Substitui sm/md/lg/xl.
+     --------------------------------------------------------------- */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.30);
+  --shadow-md: 0 4px 10px -2px rgb(0 0 0 / 0.35), 0 2px 4px -2px rgb(0 0 0 / 0.25);
+  --shadow-lg: 0 12px 24px -6px rgb(0 0 0 / 0.40), 0 4px 8px -4px rgb(0 0 0 / 0.25);
+  --shadow-xl: 0 24px 48px -12px rgb(0 0 0 / 0.55), 0 8px 16px -8px rgb(0 0 0 / 0.30);
+  --shadow-brand: 0 0 0 1px rgb(201 153 42 / 0.45), 0 8px 24px -6px rgb(201 153 42 / 0.30);
+
+  /* ---------------------------------------------------------------
+     Tipografia — fonte atual: sans-serif genérica (Arial no Windows).
+     A pilha abaixo fica pronta, mas o body continua com a fonte atual até o D2.
+     Escala baseada nos tamanhos já usados (xs 12 / sm 14 / lg 18 / 2xl 24 / 4xl 36).
+     --------------------------------------------------------------- */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: var(--font-sans);
+
+  --text-display: 2.25rem;                /* 36px — "FifaCup" da Home, nome do campeão */
+  --text-display--line-height: 2.5rem;
+  --text-display--font-weight: 800;
+  --text-display--letter-spacing: -0.02em;
+
+  --text-headline: 1.5rem;                /* 24px — título de página */
+  --text-headline--line-height: 2rem;
+  --text-headline--font-weight: 700;
+  --text-headline--letter-spacing: -0.01em;
+
+  --text-title: 1.125rem;                 /* 18px — título de modal e de seção */
+  --text-title--line-height: 1.625rem;
+  --text-title--font-weight: 700;
+
+  --text-body-lg: 1rem;                   /* 16px — placar, texto de destaque */
+  --text-body-lg--line-height: 1.5rem;
+
+  --text-body: 0.875rem;                  /* 14px — corpo (o tamanho mais usado) */
+  --text-body--line-height: 1.25rem;
+
+  --text-caption: 0.75rem;                /* 12px — legenda, metadado */
+  --text-caption--line-height: 1rem;
+
+  --text-label: 0.6875rem;                /* 11px — rótulo em caixa alta (usar com `uppercase`) */
+  --text-label--line-height: 1rem;
+  --text-label--font-weight: 700;
+  --text-label--letter-spacing: 0.06em;
+
+  /* Pesos: usar os do Tailwind — font-normal 400, font-medium 500, font-semibold 600, font-bold 700 */
+
+  /* ---------------------------------------------------------------
+     Espaçamento — a escala de 4px do Tailwind continua; só nomes para o
+     que se repete em todas as telas
+     --------------------------------------------------------------- */
+  --spacing-gutter: 1.5rem;  /* margem da página (p-6 de hoje) */
+  --spacing-card: 1rem;      /* padding interno de card (px-4 de hoje) */
+}
+
+/* O app é escuro por natureza: controles nativos (select, date picker,
+   barra de rolagem) também em modo escuro */
+:root {
+  color-scheme: dark;
+}
+
+/* Foco visível só na navegação por teclado; não aparece no clique/toque.
+   Componentes que já definem o próprio foco (focus:outline-none) continuam valendo. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+}

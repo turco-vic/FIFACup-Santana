@@ -1,14 +1,18 @@
 @import "tailwindcss";
+@import "./styles/tokens.css";
 
+/* Nomes antigos, usados em style={{ ... }} pelas telas. Mesmos valores de antes,
+   agora apontando para os tokens; somem quando o D2+ migrar as telas. */
 :root {
-  --color-green: #0D5C4A;
-  --color-gold: #C9992A;
-  --color-white: #FFFFFF;
+  --color-green: var(--background-color-canvas);
+  --color-gold: var(--color-brand);
+  --color-white: var(--text-color-primary);
 }
 
 body {
-  background-color: var(--color-green);
-  color: var(--color-white);
+  background-color: var(--background-color-canvas);
+  color: var(--text-color-primary);
+  /* Fonte atual mantida até o D2 (a pilha nova está em --font-sans) */
   font-family: sans-serif;
   margin: 0;
 }
