@@ -9,6 +9,7 @@ import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { buttonClasses } from '../components/ui/variants'
 import { useToast } from '../hooks/useToast'
 import { BottomNavBar } from '../components/BottomNav'
+import { HomeView } from './Home'
 
 // Vitrine do design system (D2). Só existe em desenvolvimento: /design
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -283,6 +284,29 @@ export default function DesignPreview() {
                             </div>
                         </div>
                     ))}
+                </Section>
+
+                {/* ---------------------------------------------------------- Home (D5) */}
+                <Section title="Home | jogador e supreme (largura de celular)">
+                    <div className="flex flex-wrap gap-6">
+                        {[
+                            { label: 'Jogador | navegador oferece instalar', isSupreme: false, canPromptInstall: true },
+                            { label: 'Supreme | iPhone (instrução de instalar)', isSupreme: true, canPromptInstall: false },
+                        ].map(demo => (
+                            <div key={demo.label} className="w-[390px] max-w-full flex flex-col gap-2">
+                                <p className="text-caption text-muted">{demo.label}</p>
+                                <div className="rounded-sheet border border-subtle bg-canvas overflow-hidden">
+                                    <HomeView
+                                        displayName={demo.isSupreme ? 'admin' : 'enzo'}
+                                        isSupreme={demo.isSupreme}
+                                        isInstalled={false}
+                                        canPromptInstall={demo.canPromptInstall}
+                                        onInstall={() => showToast('Instalar (demonstração)', 'info')}
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </Section>
 
                 {/* ---------------------------------------------------------- Modal + Toast */}
