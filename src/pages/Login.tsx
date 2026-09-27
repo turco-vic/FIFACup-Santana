@@ -2,7 +2,12 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
-import { Eye, EyeOff } from 'lucide-react'
+import { translateAuthError } from '../lib/authErrors'
+import AuthLayout from '../components/AuthLayout'
+import Button from '../components/ui/Button'
+import Input from '../components/ui/Input'
+import Alert from '../components/ui/Alert'
+import PasswordToggle from '../components/ui/PasswordToggle'
 
 export default function Login() {
     const { signIn, profile, loading } = useAuth()
@@ -42,7 +47,7 @@ export default function Login() {
         setSubmitting(true)
         const { error } = await signIn(email, password)
         if (error) {
-            setError(error.message ?? 'Email ou senha incorretos.')
+            setError(translateAuthError(error, 'Não foi possível entrar. Tente de novo.'))
             setSubmitting(false)
             return
         }
@@ -50,102 +55,74 @@ export default function Login() {
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center px-4">
-            <div className="w-full max-w-sm">
+        <AuthLayout
+            title="FifaCup Santana"
+            subtitle="Faça login para continuar"
+            footer={<>
+                Não tem conta?{' '}
+                <Link to="/register" className="font-bold text-brand-text underline-offset-4 hover:underline">
+                    Criar conta
+                </Link>
+            </>}
+        >
+            <Input
+                label="Email"
+                type="email"
+                placeholder="seu@email.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                autoComplete="email"
+                inputMode="email"
+                autoCapitalize="none"
+            />
 
-                <div className="flex flex-col items-center mb-10">
-                    <img src="/logo.png" alt="Logo" className="w-24 h-24 object-contain mb-4" />
-                    <h1 className="text-3xl font-bold" style={{ color: 'var(--color-gold)' }}>
-                        FifaCup Santana
-                    </h1>
-                    <p className="text-white/40 text-sm mt-1">Faça login para continuar</p>
-                </div>
+            <Input
+                label="Senha"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Sua senha"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                autoComplete="current-password"
+                trailing={<PasswordToggle visible={showPassword} onToggle={() => setShowPassword(!showPassword)} />}
+            />
 
-                <div className="flex flex-col gap-4">
-                    <input
+            {error && <Alert>{error}</Alert>}
+
+            <Button fullWidth size="lg" onClick={handleLogin} loading={submitting}>
+                {submitting ? 'Entrando...' : 'Entrar'}
+            </Button>
+
+            {!showReset ? (
+                <button
+                    type="button"
+                    onClick={() => setShowReset(true)}
+                    className="self-center py-1 text-body text-muted hover:text-primary underline-offset-4 hover:underline transition-colors"
+                >
+                    Esqueci minha senha
+                </button>
+            ) : (
+                <div className="flex flex-col gap-3 border-t border-subtle pt-4">
+                    <p className="text-body text-secondary">Digite seu email para redefinir a senha:</p>
+                    <Input
+                        aria-label="Email para redefinir a senha"
                         type="email"
                         placeholder="Email"
-                        value={email}
-                        onChange={e => setEmail(e.target.value)}
-                        className="w-full px-4 py-3 rounded-lg bg-white/10 text-white placeholder-white/40 border border-white/20 focus:outline-none focus:border-yellow-500"
+                        value={resetEmail}
+                        onChange={e => setResetEmail(e.target.value)}
+                        autoComplete="email"
+                        inputMode="email"
+                        autoCapitalize="none"
                     />
-
-                    <div className="relative">
-                        <input
-                            type={showPassword ? 'text' : 'password'}
-                            placeholder="Senha"
-                            value={password}
-                            onChange={e => setPassword(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && handleLogin()}
-                            className="w-full px-4 py-3 rounded-lg bg-white/10 text-white placeholder-white/40 border border-white/20 focus:outline-none focus:border-yellow-500 pr-12"
-                        />
-                        <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition"
-                        >
-                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                    </div>
-
-                    {error && (
-                        <p className="text-red-400 text-sm text-center leading-snug">{error}</p>
-                    )}
-
-                    <button
-                        onClick={handleLogin}
-                        disabled={submitting}
-                        className="w-full py-3 rounded-lg font-bold transition hover:opacity-90"
-                        style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
-                    >
-                        {submitting ? 'Entrando...' : 'Entrar'}
-                    </button>
-
-                    {/* Link para cadastro */}
-                    <p className="text-white/40 text-xs text-center">
-                        Não tem conta?{' '}
-                        <Link
-                            to="/register"
-                            className="font-bold hover:text-white transition"
-                            style={{ color: 'var(--color-gold)' }}
-                        >
-                            Criar conta
-                        </Link>
-                    </p>
-
-                    {!showReset ? (
-                        <button
-                            type="button"
-                            onClick={() => setShowReset(true)}
-                            className="text-white/40 hover:text-white text-xs text-center transition"
-                        >
-                            Esqueci minha senha
-                        </button>
+                    {resetSent ? (
+                        <Alert tone="success">Email enviado! Verifique sua caixa de entrada.</Alert>
                     ) : (
-                        <div className="flex flex-col gap-3 border-t border-white/10 pt-4">
-                            <p className="text-white/60 text-xs">Digite seu email para redefinir a senha:</p>
-                            <input
-                                type="email"
-                                placeholder="Email"
-                                value={resetEmail}
-                                onChange={e => setResetEmail(e.target.value)}
-                                className="w-full px-4 py-3 rounded-lg bg-white/10 text-white placeholder-white/40 border border-white/20 focus:outline-none focus:border-yellow-500"
-                            />
-                            {resetSent ? (
-                                <p className="text-green-400 text-sm text-center">Email enviado! Verifique sua caixa de entrada.</p>
-                            ) : (
-                                <button
-                                    onClick={handleResetPassword}
-                                    className="w-full py-3 rounded-lg font-bold text-white border border-white/30 hover:bg-white/10 transition"
-                                >
-                                    Enviar link de redefinição
-                                </button>
-                            )}
-                        </div>
+                        <Button variant="secondary" fullWidth onClick={handleResetPassword}>
+                            Enviar link de redefinição
+                        </Button>
                     )}
                 </div>
-
-            </div>
-        </div>
+            )}
+        </AuthLayout>
     )
 }

@@ -37,7 +37,8 @@ function App() {
           <ProtectedRoute>
             <Navbar />
             <BottomNav />
-            <main className="pt-16">
+            {/* pb: espaço da BottomNav flutuante (só < 768px): 24px de afastamento + 82px da pílula + folga */}
+            <main className="pt-16 pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-0">
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/players" element={<Players />} />

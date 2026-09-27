@@ -1,7 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { Eye, EyeOff } from 'lucide-react'
+import { translateAuthError } from '../lib/authErrors'
+import { Loader2 } from 'lucide-react'
+import AuthLayout from '../components/AuthLayout'
+import Button from '../components/ui/Button'
+import Input from '../components/ui/Input'
+import Alert from '../components/ui/Alert'
+import PasswordToggle from '../components/ui/PasswordToggle'
 
 export default function ResetPassword() {
   const navigate = useNavigate()
@@ -13,9 +19,16 @@ export default function ResetPassword() {
   const [checking, setChecking] = useState(true)
 
   useEffect(() => {
+    // A limpeza precisa sair do próprio efeito: retornada de dentro da função async,
+    // ela nunca rodava e a escuta de login e o timer ficavam ativos depois de sair da tela
+    let cancelled = false
+    let subscription: { unsubscribe: () => void } | undefined
+    let timer: ReturnType<typeof setTimeout> | undefined
+
     async function init() {
       // Tenta pegar sessão existente primeiro
       const { data: { session } } = await supabase.auth.getSession()
+      if (cancelled) return
       if (session) {
         setReady(true)
         setChecking(false)
@@ -23,7 +36,7 @@ export default function ResetPassword() {
       }
 
       // Escuta evento de PASSWORD_RECOVERY ou SIGNED_IN via hash token
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      subscription = supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
           if (session) {
             setReady(true)
@@ -34,17 +47,20 @@ export default function ResetPassword() {
           setReady(false)
           setChecking(false)
         }
-      })
+      }).data.subscription
 
       // Timeout - se após 5s não tiver sessão, mostra erro
-      setTimeout(() => {
+      timer = setTimeout(() => {
         setChecking(false)
       }, 5000)
-
-      return () => subscription.unsubscribe()
     }
 
     init()
+    return () => {
+      cancelled = true
+      subscription?.unsubscribe()
+      clearTimeout(timer)
+    }
   }, [])
 
   async function handleReset() {
@@ -59,7 +75,7 @@ export default function ResetPassword() {
     const { error } = await supabase.auth.updateUser({ password })
 
     if (error) {
-      setError(`Erro: ${error.message}`)
+      setError(translateAuthError(error, 'Não foi possível salvar a nova senha. Tente de novo.'))
       setSaving(false)
       return
     }
@@ -69,75 +85,43 @@ export default function ResetPassword() {
 
   if (checking) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-white/20 border-t-yellow-500 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-white mb-2">Verificando link...</p>
-        </div>
+      <div className="min-h-dvh flex flex-col items-center justify-center gap-4 px-5" role="status">
+        <Loader2 size={32} className="animate-spin text-brand" aria-hidden />
+        <p className="text-body-lg text-primary">Verificando link...</p>
       </div>
     )
   }
 
   if (!ready) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4">
-        <div className="text-center flex flex-col items-center gap-4">
-          <p className="text-white/60">Link inválido ou expirado.</p>
-          <button
-            onClick={() => navigate('/login')}
-            className="px-6 py-3 rounded-xl font-bold transition hover:opacity-90"
-            style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
-          >
-            Voltar ao login
-          </button>
-        </div>
-      </div>
+      <AuthLayout title="Nova senha">
+        <Alert tone="warning">Link inválido ou expirado.</Alert>
+        <Button fullWidth size="lg" onClick={() => navigate('/login')}>
+          Voltar ao login
+        </Button>
+      </AuthLayout>
     )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-sm">
+    <AuthLayout title="Nova senha" subtitle="Digite sua nova senha abaixo">
+      <Input
+        label="Nova senha"
+        type={showPassword ? 'text' : 'password'}
+        placeholder="Nova senha"
+        hint="Mínimo de 6 caracteres."
+        value={password}
+        onChange={e => setPassword(e.target.value)}
+        onKeyDown={e => e.key === 'Enter' && handleReset()}
+        autoComplete="new-password"
+        trailing={<PasswordToggle visible={showPassword} onToggle={() => setShowPassword(!showPassword)} />}
+      />
 
-        <div className="flex flex-col items-center mb-10">
-          <img src="/logo.png" alt="FifaCup Santana" className="w-20 h-20 object-contain mb-4" />
-          <h1 className="text-2xl font-bold text-white">Nova senha</h1>
-          <p className="text-white/40 text-sm mt-1">Digite sua nova senha abaixo</p>
-        </div>
+      {error && <Alert>{error}</Alert>}
 
-        <div className="flex flex-col gap-4">
-          <div className="relative">
-            <input
-              type={showPassword ? 'text' : 'password'}
-              placeholder="Nova senha"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleReset()}
-              autoComplete="new-password"
-              className="w-full px-4 py-3 rounded-lg bg-white/10 text-white placeholder-white/40 border border-white/20 focus:outline-none focus:border-yellow-500 pr-12"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition"
-            >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
-          </div>
-
-          {error && <p className="text-red-400 text-sm">{error}</p>}
-
-          <button
-            onClick={handleReset}
-            disabled={saving}
-            className="w-full py-3 rounded-lg font-bold transition hover:opacity-90"
-            style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
-          >
-            {saving ? 'Salvando...' : 'Salvar nova senha'}
-          </button>
-        </div>
-
-      </div>
-    </div>
+      <Button fullWidth size="lg" onClick={handleReset} loading={saving}>
+        {saving ? 'Salvando...' : 'Salvar nova senha'}
+      </Button>
+    </AuthLayout>
   )
 }

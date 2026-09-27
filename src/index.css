@@ -12,16 +12,11 @@
 body {
   background-color: var(--background-color-canvas);
   color: var(--text-color-primary);
-  /* Fonte atual mantida até o D2 (a pilha nova está em --font-sans) */
-  font-family: sans-serif;
+  /* Fonte do sistema no corpo; títulos e placares usam font-display (Barlow Condensed) */
+  font-family: var(--font-sans);
   margin: 0;
 }
 
 
-/* Espaço no fim da página para a BottomNav flutuante (só < 768px):
-   24px de afastamento + 82px da pílula + folga, acima da barra de gestos do iPhone */
-@media (max-width: 767.98px) {
-  body {
-    padding-bottom: calc(7.5rem + env(safe-area-inset-bottom));
-  }
-}
+/* O espaço no fim da página para a BottomNav fica no <main> das páginas logadas (App.tsx):
+   login e cadastro não têm BottomNav e não precisam dele. */

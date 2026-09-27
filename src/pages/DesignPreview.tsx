@@ -103,12 +103,12 @@ export default function DesignPreview() {
                 </Section>
 
                 {/* ---------------------------------------------------------- Tipografia */}
-                <Section title="Tipografia | atual × proposta">
+                <Section title="Tipografia | antes × agora">
                     <div className="grid sm:grid-cols-2 gap-4">
                         <Card>
                             <CardBody className="flex flex-col gap-2" >
                                 <div style={{ fontFamily: 'sans-serif' }} className="flex flex-col gap-2">
-                                    <p className="text-caption text-muted">Atual | sans-serif (Arial no Windows) em tudo</p>
+                                    <p className="text-caption text-muted">Antes | sans-serif (Arial no Windows) em tudo</p>
                                     <p className="text-2xl font-bold" style={{ color: 'var(--color-gold)' }}>Meus campeonatos</p>
                                     <p className="font-bold text-sm" style={{ color: 'var(--color-gold)' }}>Grupo A</p>
                                     <p className="text-sm text-white">Enzo venceu Lucas por 3 × 2 e garantiu a vaga nas semifinais.</p>
@@ -118,7 +118,7 @@ export default function DesignPreview() {
                         </Card>
                         <Card>
                             <CardBody className="flex flex-col gap-2">
-                                <p className="text-caption text-muted">Proposta | Barlow Condensed nos títulos e placares, fonte do sistema no corpo</p>
+                                <p className="text-caption text-muted">Agora | Barlow Condensed nos títulos e placares, fonte do sistema no corpo</p>
                                 <p className="font-display font-bold text-headline uppercase tracking-wide text-brand-text">Meus campeonatos</p>
                                 <p className="font-display font-bold text-title uppercase tracking-wide text-brand-text">Grupo A</p>
                                 <p className="text-body text-secondary">Enzo venceu Lucas por 3 × 2 e garantiu a vaga nas semifinais.</p>

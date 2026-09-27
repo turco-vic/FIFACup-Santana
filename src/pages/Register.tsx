@@ -1,7 +1,13 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { Eye, EyeOff, CheckCircle } from 'lucide-react'
+import { translateAuthError } from '../lib/authErrors'
+import { CheckCircle2 } from 'lucide-react'
+import AuthLayout from '../components/AuthLayout'
+import Button from '../components/ui/Button'
+import Input from '../components/ui/Input'
+import Alert from '../components/ui/Alert'
+import PasswordToggle from '../components/ui/PasswordToggle'
 
 export default function Register() {
     const { signUp } = useAuth()
@@ -39,7 +45,7 @@ export default function Register() {
         const { error } = await signUp(email, password, name.trim())
 
         if (error) {
-            setError(error.message ?? 'Erro ao criar conta.')
+            setError(translateAuthError(error, 'Erro ao criar conta.'))
             setSubmitting(false)
             return
         }
@@ -49,116 +55,81 @@ export default function Register() {
 
     if (done) {
         return (
-            <div className="min-h-screen flex items-center justify-center px-4">
-                <div className="w-full max-w-sm text-center flex flex-col items-center gap-5">
-                    <div
-                        className="w-16 h-16 rounded-full flex items-center justify-center"
-                        style={{ backgroundColor: 'rgba(201,153,42,0.15)' }}
-                    >
-                        <CheckCircle size={32} style={{ color: 'var(--color-gold)' }} />
+            <AuthLayout title="Conta criada!">
+                <div className="flex flex-col items-center text-center gap-4 py-2">
+                    <div className="w-16 h-16 rounded-full flex items-center justify-center bg-success-subtle border border-success-border">
+                        <CheckCircle2 size={32} className="text-success" aria-hidden />
                     </div>
-                    <div>
-                        <h2 className="text-white font-bold text-xl mb-2">Conta criada!</h2>
-                        <p className="text-white/50 text-sm leading-relaxed">
-                            Seu cadastro foi enviado para aprovação.{' '}
-                            Aguarde o <span className="text-white font-medium">AdminSupremo</span> liberar seu acesso.
-                        </p>
-                    </div>
-                    <button
-                        onClick={() => navigate('/login')}
-                        className="px-6 py-3 rounded-lg font-bold transition hover:opacity-90"
-                        style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
-                    >
-                        Voltar ao login
-                    </button>
+                    <p className="text-body text-secondary leading-relaxed">
+                        Seu cadastro foi enviado para aprovação.{' '}
+                        Aguarde o <span className="text-primary font-semibold">AdminSupremo</span> liberar seu acesso.
+                    </p>
                 </div>
-            </div>
+                <Button fullWidth size="lg" onClick={() => navigate('/login')}>
+                    Voltar ao login
+                </Button>
+            </AuthLayout>
         )
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center px-4">
-            <div className="w-full max-w-sm">
+        <AuthLayout
+            title="Criar conta"
+            subtitle="Sua conta será aprovada pelo AdminSupremo"
+            footer={<>
+                Já tem conta?{' '}
+                <Link to="/login" className="font-bold text-brand-text underline-offset-4 hover:underline">
+                    Fazer login
+                </Link>
+            </>}
+        >
+            <Input
+                label="Nome completo"
+                type="text"
+                placeholder="Seu nome completo"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                autoComplete="name"
+                autoCapitalize="words"
+            />
 
-                <div className="flex flex-col items-center mb-10">
-                    <img src="/logo.png" alt="Logo" className="w-20 h-20 object-contain mb-4" />
-                    <h1 className="text-2xl font-bold" style={{ color: 'var(--color-gold)' }}>
-                        Criar conta
-                    </h1>
-                    <p className="text-white/40 text-sm mt-1 text-center">
-                        Sua conta será aprovada pelo AdminSupremo
-                    </p>
-                </div>
+            <Input
+                label="Email"
+                type="email"
+                placeholder="seu@email.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                autoComplete="email"
+                inputMode="email"
+                autoCapitalize="none"
+            />
 
-                <div className="flex flex-col gap-4">
-                    <input
-                        type="text"
-                        placeholder="Nome completo"
-                        value={name}
-                        onChange={e => setName(e.target.value)}
-                        className="w-full px-4 py-3 rounded-lg bg-white/10 text-white placeholder-white/40 border border-white/20 focus:outline-none focus:border-yellow-500"
-                    />
+            <Input
+                label="Senha"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Crie uma senha"
+                hint="Mínimo de 6 caracteres."
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                autoComplete="new-password"
+                trailing={<PasswordToggle visible={showPassword} onToggle={() => setShowPassword(!showPassword)} />}
+            />
 
-                    <input
-                        type="email"
-                        placeholder="Email"
-                        value={email}
-                        onChange={e => setEmail(e.target.value)}
-                        className="w-full px-4 py-3 rounded-lg bg-white/10 text-white placeholder-white/40 border border-white/20 focus:outline-none focus:border-yellow-500"
-                    />
+            <Input
+                label="Confirmar senha"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Repita a senha"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleRegister()}
+                autoComplete="new-password"
+            />
 
-                    <div className="relative">
-                        <input
-                            type={showPassword ? 'text' : 'password'}
-                            placeholder="Senha (mín. 6 caracteres)"
-                            value={password}
-                            onChange={e => setPassword(e.target.value)}
-                            className="w-full px-4 py-3 rounded-lg bg-white/10 text-white placeholder-white/40 border border-white/20 focus:outline-none focus:border-yellow-500 pr-12"
-                        />
-                        <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition"
-                        >
-                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                    </div>
+            {error && <Alert>{error}</Alert>}
 
-                    <input
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder="Confirmar senha"
-                        value={confirmPassword}
-                        onChange={e => setConfirmPassword(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && handleRegister()}
-                        className="w-full px-4 py-3 rounded-lg bg-white/10 text-white placeholder-white/40 border border-white/20 focus:outline-none focus:border-yellow-500"
-                    />
-
-                    {error && (
-                        <p className="text-red-400 text-sm text-center">{error}</p>
-                    )}
-
-                    <button
-                        onClick={handleRegister}
-                        disabled={submitting}
-                        className="w-full py-3 rounded-lg font-bold transition hover:opacity-90"
-                        style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
-                    >
-                        {submitting ? 'Criando conta...' : 'Criar conta'}
-                    </button>
-
-                    <p className="text-white/40 text-xs text-center">
-                        Já tem conta?{' '}
-                        <Link
-                            to="/login"
-                            className="font-bold hover:text-white transition"
-                            style={{ color: 'var(--color-gold)' }}
-                        >
-                            Fazer login
-                        </Link>
-                    </p>
-                </div>
-
-            </div>
-        </div>
+            <Button fullWidth size="lg" onClick={handleRegister} loading={submitting}>
+                {submitting ? 'Criando conta...' : 'Criar conta'}
+            </Button>
+        </AuthLayout>
     )
 }

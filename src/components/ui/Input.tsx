@@ -45,7 +45,8 @@ export default function Input({
                         'w-full rounded-card bg-fill-strong border text-primary',
                         variant === 'score'
                             ? 'h-16 text-center font-display font-bold text-4xl tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
-                            : 'h-11 text-body',
+                            // 16px no celular: abaixo disso o Safari do iPhone dá zoom ao focar o campo
+                            : 'h-11 text-body-lg sm:text-body',
                         'placeholder:text-muted transition-colors duration-150',
                         'focus:outline-none focus:ring-2',
                         error

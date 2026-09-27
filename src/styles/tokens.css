@@ -139,7 +139,7 @@
 
   /* ---------------------------------------------------------------
      Tipografia - fonte atual: sans-serif genérica (Arial no Windows).
-     A pilha abaixo fica pronta, mas o body continua com a fonte atual até o D2.
+     Corpo: fonte do sistema (--font-sans, aplicada no body). Títulos e placares: --font-display.
      Escala baseada nos tamanhos já usados (xs 12 / sm 14 / lg 18 / 2xl 24 / 4xl 36).
      --------------------------------------------------------------- */
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
