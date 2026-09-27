@@ -1,63 +1,101 @@
+import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { CircleUser, House, ShieldCheck, Trophy, Users, type LucideIcon } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
-import { Home, Users, User, Shield, Trophy } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
+import { cx } from '../lib/cx'
 
+type NavItem = {
+    path: string
+    label: string
+    icon: LucideIcon
+    // Rotas além do path exato que mantêm a aba ativa
+    matches?: (pathname: string) => boolean
+    badge?: boolean
+}
+
+// Pílula flutuante só no mobile (< 768px); no desktop a navegação é a Sidebar (☰ da NavBar)
 export default function BottomNav() {
     const { isSupreme } = useAuth()
-    const location = useLocation()
-    const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640)
+    const { pathname } = useLocation()
+    const pendingCount = usePendingApprovals(isSupreme, pathname)
+    return <BottomNavBar isSupreme={isSupreme} pathname={pathname} pendingCount={pendingCount} />
+}
 
-    useEffect(() => {
-        const handler = () => setIsMobile(window.innerWidth < 640)
-        window.addEventListener('resize', handler)
-        return () => window.removeEventListener('resize', handler)
-    }, [])
-
-    if (!isMobile) return null
-
-    const navItems = isSupreme
-        ? [
-            { path: '/', label: 'Home', icon: Home },
-            { path: '/tournaments', label: 'Campeonatos', icon: Trophy },
+// Só apresentação (sem login nem rota própria): usada pela BottomNav e pela vitrine /design.
+// inline: renderiza no fluxo da página em vez de fixa na base (vitrine)
+export function BottomNavBar({ isSupreme, pathname, pendingCount, inline = false }: {
+    isSupreme: boolean
+    pathname: string
+    pendingCount: number
+    inline?: boolean
+}) {
+    const items: NavItem[] = [
+        { path: '/', label: 'Home', icon: House },
+        // Dentro de um campeonato (/tournament/:id) a aba Campeonatos continua ativa
+        { path: '/tournaments', label: 'Campeonatos', icon: Trophy, matches: p => p.startsWith('/tournament') },
+        ...(isSupreme ? [
             { path: '/players', label: 'Usuários', icon: Users },
-            { path: '/admin', label: 'Supreme', icon: Shield },
-        ]
-        : [
-            { path: '/', label: 'Home', icon: Home },
-            { path: '/tournaments', label: 'Campeonatos', icon: Trophy },
-            { path: '/profile', label: 'Perfil', icon: User },
-        ]
+            { path: '/admin', label: 'Supreme', icon: ShieldCheck, badge: pendingCount > 0 },
+        ] : []),
+        { path: '/profile', label: 'Perfil', icon: CircleUser },
+    ]
 
     return (
         <nav
-            className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around px-2 py-2 border-t border-white/10"
-            style={{ backgroundColor: 'rgba(5,40,30,0.97)', backdropFilter: 'blur(10px)' }}
+            aria-label="Navegação principal"
+            className={cx(
+                'rounded-full bg-deep shadow-xl border border-white/10 flex items-center justify-between px-4 py-4',
+                // z-40: acima do conteúdo e abaixo de modais (50), Sidebar (60/70) e Toast (100)
+                inline ? 'relative' : 'md:hidden fixed left-10 right-10 z-40',
+            )}
+            // Acima da barra de gestos do iPhone (env() exige viewport-fit=cover no index.html)
+            style={inline ? undefined : { bottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
         >
-            {navItems.map(({ path, label, icon: Icon }) => {
-                // Dentro de um campeonato (/tournament/:id) a aba Campeonatos continua ativa
-                const active = path === '/tournaments'
-                    ? location.pathname.startsWith('/tournament')
-                    : location.pathname === path
+            {items.map(({ path, label, icon: Icon, matches, badge }) => {
+                const active = matches ? matches(pathname) : pathname === path
+                const showBadge = badge && !active
                 return (
                     <Link
                         key={path}
                         to={path}
-                        className="flex flex-col items-center gap-1 px-3 py-1 rounded-xl transition"
+                        aria-label={showBadge ? `${label} (cadastros aguardando aprovação)` : label}
+                        aria-current={active ? 'page' : undefined}
+                        className={cx(
+                            'relative flex items-center justify-center w-12 h-12 rounded-full transition-all duration-400',
+                            active
+                                ? 'bg-white/16 text-brand scale-140'
+                                : 'text-white/40 hover:text-white/70 hover:bg-white/8',
+                        )}
                     >
-                        <Icon
-                            size={22}
-                            style={active ? { color: 'var(--color-gold)' } : { color: 'rgba(255,255,255,0.4)' }}
-                        />
-                        <span
-                            className="text-xs font-medium"
-                            style={active ? { color: 'var(--color-gold)' } : { color: 'rgba(255,255,255,0.4)' }}
-                        >
-                            {label}
-                        </span>
+                        <Icon className="w-5 h-5" strokeWidth={1.5} aria-hidden />
+                        {showBadge && (
+                            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-danger-solid" aria-hidden />
+                        )}
                     </Link>
                 )
             })}
         </nav>
     )
+}
+
+// Cadastros com status 'pending' (só o supreme aprova). Recontado a cada troca de rota:
+// aprovar alguém em /admin e sair já atualiza a bolinha.
+function usePendingApprovals(isSupreme: boolean, pathname: string): number {
+    const [count, setCount] = useState(0)
+
+    useEffect(() => {
+        if (!isSupreme) { setCount(0); return }
+        let cancelled = false
+        supabase
+            .from('profiles')
+            .select('id', { count: 'exact', head: true })
+            .eq('status', 'pending')
+            .then(({ count: pending, error }) => {
+                if (!cancelled && !error) setCount(pending ?? 0)
+            })
+        return () => { cancelled = true }
+    }, [isSupreme, pathname])
+
+    return count
 }

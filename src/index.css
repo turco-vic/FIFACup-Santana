@@ -18,14 +18,10 @@ body {
 }
 
 
-@media (max-width: 640px) {
+/* Espaço no fim da página para a BottomNav flutuante (só < 768px):
+   24px de afastamento + 82px da pílula + folga, acima da barra de gestos do iPhone */
+@media (max-width: 767.98px) {
   body {
-    padding-bottom: 72px;
-  }
-}
-
-@media (min-width: 640px) {
-  .bottom-nav {
-    display: none !important;
+    padding-bottom: calc(7.5rem + env(safe-area-inset-bottom));
   }
 }

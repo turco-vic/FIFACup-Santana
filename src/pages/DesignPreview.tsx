@@ -8,6 +8,7 @@ import Modal from '../components/ui/Modal'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { buttonClasses } from '../components/ui/variants'
 import { useToast } from '../hooks/useToast'
+import { BottomNavBar } from '../components/BottomNav'
 
 // Vitrine do design system (D2). Só existe em desenvolvimento: /design
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -264,6 +265,24 @@ export default function DesignPreview() {
                             </CardBody>
                         </Card>
                     </div>
+                </Section>
+
+                {/* ---------------------------------------------------------- BottomNav */}
+                <Section title="BottomNav | pílula flutuante (só < 768px)">
+                    {[
+                        { label: 'Jogador | em Home', isSupreme: false, pathname: '/', pending: 0 },
+                        { label: 'Jogador | dentro de um campeonato (/tournament/:id)', isSupreme: false, pathname: '/tournament/x', pending: 0 },
+                        { label: 'Supreme | em Campeonatos, com cadastros pendentes (bolinha em Supreme)', isSupreme: true, pathname: '/tournaments', pending: 3 },
+                        { label: 'Supreme | em Supreme (bolinha some na aba ativa)', isSupreme: true, pathname: '/admin', pending: 3 },
+                    ].map(demo => (
+                        <div key={demo.label} className="flex flex-col gap-3">
+                            <p className="text-caption text-muted">{demo.label}</p>
+                            {/* Largura de um celular de 390px menos as margens laterais da pílula (40px de cada lado) */}
+                            <div className="max-w-[310px] py-3">
+                                <BottomNavBar inline isSupreme={demo.isSupreme} pathname={demo.pathname} pendingCount={demo.pending} />
+                            </div>
+                        </div>
+                    ))}
                 </Section>
 
                 {/* ---------------------------------------------------------- Modal + Toast */}
