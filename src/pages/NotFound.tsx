@@ -3,7 +3,7 @@ import { Home } from 'lucide-react'
 
 export default function NotFound() {
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
+        <div className="min-h-[70dvh] flex flex-col items-center justify-center p-6 text-center">
             <p className="text-8xl font-bold mb-4" style={{ color: 'var(--color-gold)' }}>
                 404
             </p>

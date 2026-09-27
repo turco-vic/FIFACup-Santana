@@ -34,7 +34,7 @@ export default function Toast({ message, type = 'success', onClose }: Props) {
             role={type === 'error' ? 'alert' : 'status'}
             aria-live={type === 'error' ? 'assertive' : 'polite'}
             className={cx(
-                'fixed z-[100] top-[4.5rem] inset-x-4 sm:inset-x-auto sm:right-4 sm:w-96',
+                'fixed z-[100] top-[calc(4.5rem+env(safe-area-inset-top))] inset-x-4 sm:inset-x-auto sm:right-4 sm:w-96',
                 'flex items-start gap-3 pl-4 pr-2 py-3 rounded-card border border-inverse border-l-4',
                 'bg-inverse shadow-xl motion-safe:animate-toast-in',
                 style.stripe,

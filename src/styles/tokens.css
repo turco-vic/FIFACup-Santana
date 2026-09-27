@@ -34,7 +34,7 @@
      Separação medida contra o canvas: card 1,29:1 (antes 1,13:1),
      modal 1,36:1, hover 1,44:1. O modal ainda ganha overlay, sombra e borda.
      --------------------------------------------------------------- */
-  --background-color-deep: #081F16;           /* sidebar, bottom nav, zonas de perigo */
+  --background-color-deep: #081F16;           /* cabeçalho, bottom nav, zonas de perigo */
   --background-color-canvas: #0D5C4A;         /* fundo da página (verde do logo) */
   --background-color-surface: #246D5C;        /* card */
   --background-color-elevated: #297060;       /* modal, popover, sheet (usar com shadow) */

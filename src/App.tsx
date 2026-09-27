@@ -1,7 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import Navbar from './components/NavBar'
-import BottomNav from './components/BottomNav'
+import AppShell from './components/AppShell'
 import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -35,10 +34,7 @@ function App() {
 
         <Route path="/*" element={
           <ProtectedRoute>
-            <Navbar />
-            <BottomNav />
-            {/* pb: espaço da BottomNav flutuante (só < 768px): 24px de afastamento + 82px da pílula + folga */}
-            <main className="pt-16 pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-0">
+            <AppShell>
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/players" element={<Players />} />
@@ -58,7 +54,7 @@ function App() {
                 } />
                 <Route path="*" element={<NotFound />} />
               </Routes>
-            </main>
+            </AppShell>
           </ProtectedRoute>
         } />
       </Routes>

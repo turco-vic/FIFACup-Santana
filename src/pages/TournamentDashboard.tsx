@@ -632,6 +632,16 @@ export default function TournamentDashboard() {
                                             <span className="text-caption text-muted ml-1">gols</span>
                                         </RankRow>
                                     ))}
+                                    {/* Artilharia completa por jogador: só o 1v1 grava gols por jogador */}
+                                    {tournament.mode === '1v1' && (
+                                        <Link
+                                            to={`/top-scorers?t=${tournament.id}`}
+                                            className="flex items-center justify-center gap-1 px-card py-3 border-t border-subtle text-body font-semibold text-brand-text hover:bg-surface-hover transition-colors"
+                                        >
+                                            Ver artilharia completa
+                                            <ChevronRight size={16} aria-hidden />
+                                        </Link>
+                                    )}
                                 </Card>
                             )}
 

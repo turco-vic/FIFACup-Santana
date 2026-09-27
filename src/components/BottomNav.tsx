@@ -1,65 +1,38 @@
-import { useEffect, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
-import { CircleUser, House, ShieldCheck, Trophy, Users, type LucideIcon } from 'lucide-react'
-import { useAuth } from '../hooks/useAuth'
-import { supabase } from '../lib/supabase'
+import { Link } from 'react-router-dom'
 import { cx } from '../lib/cx'
+import { getNavItems, isNavActive, PENDING_HINT } from './nav'
 
-type NavItem = {
-    path: string
-    label: string
-    icon: LucideIcon
-    // Rotas além do path exato que mantêm a aba ativa
-    matches?: (pathname: string) => boolean
-    badge?: boolean
-}
-
-// Pílula flutuante só no mobile (< 768px); no desktop a navegação é a Sidebar (☰ da NavBar)
-export default function BottomNav() {
-    const { isSupreme } = useAuth()
-    const { pathname } = useLocation()
-    const pendingCount = usePendingApprovals(isSupreme, pathname)
-    return <BottomNavBar isSupreme={isSupreme} pathname={pathname} pendingCount={pendingCount} />
-}
-
-// Só apresentação (sem login nem rota própria): usada pela BottomNav e pela vitrine /design.
+// Pílula flutuante só no mobile (< 768px); no desktop a navegação fica no cabeçalho (NavBar).
+// Só apresentação: os dados vêm do AppShell (e da vitrine /design).
 // inline: renderiza no fluxo da página em vez de fixa na base (vitrine)
-export function BottomNavBar({ isSupreme, pathname, pendingCount, inline = false }: {
+export default function BottomNav({ isSupreme, pathname, pendingCount, inline = false }: {
     isSupreme: boolean
     pathname: string
     pendingCount: number
     inline?: boolean
 }) {
-    const items: NavItem[] = [
-        { path: '/', label: 'Home', icon: House },
-        // Dentro de um campeonato (/tournament/:id) a aba Campeonatos continua ativa
-        { path: '/tournaments', label: 'Campeonatos', icon: Trophy, matches: p => p.startsWith('/tournament') },
-        ...(isSupreme ? [
-            { path: '/players', label: 'Usuários', icon: Users },
-            { path: '/admin', label: 'Supreme', icon: ShieldCheck, badge: pendingCount > 0 },
-        ] : []),
-        { path: '/profile', label: 'Perfil', icon: CircleUser },
-    ]
+    const items = getNavItems(isSupreme, pendingCount)
 
     return (
         <nav
             aria-label="Navegação principal"
             className={cx(
                 'rounded-full bg-deep shadow-xl border border-white/10 flex items-center justify-between px-4 py-4',
-                // z-40: acima do conteúdo e abaixo de modais (50), Sidebar (60/70) e Toast (100)
+                // z-40: acima do conteúdo e do cabeçalho (30), abaixo de modais (50) e Toast (100)
                 inline ? 'relative' : 'md:hidden fixed left-10 right-10 z-40',
             )}
             // Acima da barra de gestos do iPhone (env() exige viewport-fit=cover no index.html)
             style={inline ? undefined : { bottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
         >
-            {items.map(({ path, label, icon: Icon, matches, badge }) => {
-                const active = matches ? matches(pathname) : pathname === path
+            {items.map(item => {
+                const { path, label, icon: Icon, badge } = item
+                const active = isNavActive(item, pathname)
                 const showBadge = badge && !active
                 return (
                     <Link
                         key={path}
                         to={path}
-                        aria-label={showBadge ? `${label} (cadastros aguardando aprovação)` : label}
+                        aria-label={showBadge ? `${label} (${PENDING_HINT})` : label}
                         aria-current={active ? 'page' : undefined}
                         className={cx(
                             'relative flex items-center justify-center w-12 h-12 rounded-full transition-all duration-400',
@@ -77,25 +50,4 @@ export function BottomNavBar({ isSupreme, pathname, pendingCount, inline = false
             })}
         </nav>
     )
-}
-
-// Cadastros com status 'pending' (só o supreme aprova). Recontado a cada troca de rota:
-// aprovar alguém em /admin e sair já atualiza a bolinha.
-function usePendingApprovals(isSupreme: boolean, pathname: string): number {
-    const [count, setCount] = useState(0)
-
-    useEffect(() => {
-        if (!isSupreme) { setCount(0); return }
-        let cancelled = false
-        supabase
-            .from('profiles')
-            .select('id', { count: 'exact', head: true })
-            .eq('status', 'pending')
-            .then(({ count: pending, error }) => {
-                if (!cancelled && !error) setCount(pending ?? 0)
-            })
-        return () => { cancelled = true }
-    }, [isSupreme, pathname])
-
-    return count
 }

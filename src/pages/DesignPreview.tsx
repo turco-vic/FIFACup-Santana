@@ -9,7 +9,9 @@ import Alert from '../components/ui/Alert'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { buttonClasses } from '../components/ui/variants'
 import { useToast } from '../hooks/useToast'
-import { BottomNavBar } from '../components/BottomNav'
+import BottomNav from '../components/BottomNav'
+import NavBar from '../components/NavBar'
+import AppFooter from '../components/AppFooter'
 import { HomeView } from './Home'
 import { ChampionCard, MatchRow } from './TournamentDashboard'
 import { TournamentCard } from './Tournaments'
@@ -315,7 +317,71 @@ export default function DesignPreview() {
                     </div>
                 </Section>
 
-                {/* ---------------------------------------------------------- BottomNav */}
+                {/* ---------------------------------------------------------- Navegação */}
+                <Section title="Cabeçalho | mobile (< 768px): só logo e usuário">
+                    {[
+                        { label: 'Jogador', isSupreme: false, name: 'enzo', pending: 0 },
+                        { label: 'Supreme com cadastros pendentes (a bolinha fica só na BottomNav)', isSupreme: true, name: 'admin', pending: 3 },
+                        { label: 'Nome longo (corta com reticências)', isSupreme: false, name: 'gabriel_fernandes_2026', pending: 0 },
+                    ].map(demo => (
+                        <div key={demo.label} className="w-[390px] max-w-full flex flex-col gap-2">
+                            <p className="text-caption text-muted">{demo.label}</p>
+                            <div className="rounded-card overflow-hidden border border-subtle">
+                                <NavBar inline isSupreme={demo.isSupreme} pathname="/" pendingCount={demo.pending} displayName={demo.name} />
+                            </div>
+                        </div>
+                    ))}
+                </Section>
+
+                <Section title="Cabeçalho | desktop (>= 768px): destinos em texto">
+                    <p className="text-caption text-muted -mt-2">Em tamanho real (largura indicada); se a janela for mais estreita, role para o lado.</p>
+                    {[
+                        { label: '1280px | jogador dentro de um campeonato (Campeonatos ativo)', w: 1280, isSupreme: false, pathname: '/tournament/x', pending: 0 },
+                        { label: '1280px | supreme em Campeonatos, com cadastros pendentes (bolinha em Supreme)', w: 1280, isSupreme: true, pathname: '/tournaments', pending: 3 },
+                        { label: '1024px | supreme em Supreme (bolinha some no item ativo)', w: 1024, isSupreme: true, pathname: '/admin', pending: 3 },
+                        { label: '800px | tablet: some o nome do app e do usuário para caber os 5 itens', w: 800, isSupreme: true, pathname: '/profile', pending: 0 },
+                    ].map(demo => (
+                        <div key={demo.label} className="flex flex-col gap-2">
+                            <p className="text-caption text-muted">{demo.label}</p>
+                            {/* Sai da coluna da vitrine (768px) para mostrar o tamanho real; janela estreita rola */}
+                            <div className="overflow-x-auto rounded-card border border-subtle relative left-1/2 -translate-x-1/2"
+                                style={{ width: `min(${demo.w + 2}px, calc(100vw - 3rem))` }}>
+                                <div style={{ width: demo.w }}>
+                                    <NavBar inline isSupreme={demo.isSupreme} pathname={demo.pathname} pendingCount={demo.pending} displayName={demo.isSupreme ? 'admin' : 'enzo'} />
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </Section>
+
+                <Section title="Rodapé | fim de toda tela logada">
+                    <div className="flex flex-wrap gap-6 items-start">
+                        <div className="w-[390px] max-w-full flex flex-col gap-2">
+                            <p className="text-caption text-muted">Mobile: fim da página rolada até o fim, acima da pílula</p>
+                            {/* Mesmo espaço que o <main> reserva para a BottomNav (7.5rem) */}
+                            <div className="relative rounded-sheet border border-subtle bg-canvas overflow-hidden pb-[7.5rem]">
+                                <div className="px-4 pt-4 flex flex-col gap-2">
+                                    <div className="h-14 rounded-card bg-surface border border-subtle" />
+                                    <div className="h-14 rounded-card bg-surface border border-subtle" />
+                                </div>
+                                <AppFooter />
+                                <div className="absolute left-10 right-10 bottom-6">
+                                    <BottomNav inline isSupreme={false} pathname="/" pendingCount={0} />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="w-[390px] max-w-full flex flex-col gap-2">
+                            <p className="text-caption text-muted">Desktop: fim normal da página</p>
+                            <div className="rounded-sheet border border-subtle bg-canvas overflow-hidden">
+                                <div className="px-4 pt-4">
+                                    <div className="h-14 rounded-card bg-surface border border-subtle" />
+                                </div>
+                                <AppFooter />
+                            </div>
+                        </div>
+                    </div>
+                </Section>
+
                 <Section title="BottomNav | pílula flutuante (só < 768px)">
                     {[
                         { label: 'Jogador | em Home', isSupreme: false, pathname: '/', pending: 0 },
@@ -327,7 +393,7 @@ export default function DesignPreview() {
                             <p className="text-caption text-muted">{demo.label}</p>
                             {/* Largura de um celular de 390px menos as margens laterais da pílula (40px de cada lado) */}
                             <div className="max-w-[310px] py-3">
-                                <BottomNavBar inline isSupreme={demo.isSupreme} pathname={demo.pathname} pendingCount={demo.pending} />
+                                <BottomNav inline isSupreme={demo.isSupreme} pathname={demo.pathname} pendingCount={demo.pending} />
                             </div>
                         </div>
                     ))}
