@@ -5,6 +5,7 @@ import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
 import Input from '../components/ui/Input'
 import Modal from '../components/ui/Modal'
+import Alert from '../components/ui/Alert'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { buttonClasses } from '../components/ui/variants'
 import { useToast } from '../hooks/useToast'
@@ -12,6 +13,9 @@ import { BottomNavBar } from '../components/BottomNav'
 import { HomeView } from './Home'
 import { ChampionCard, MatchRow } from './TournamentDashboard'
 import { TournamentCard } from './Tournaments'
+import { DraftZone, MovingBar } from './TournamentManage'
+import { POOL, emptyDraft, moveInDraft, draftProblem, type DraftTarget, type GroupDraft } from '../lib/groupDraft'
+import { shuffle } from '../lib/shuffle'
 import GroupTable from '../components/GroupTable'
 import KnockoutBracket from '../components/KnockoutBracket'
 import ScoreModal from '../components/ScoreModal'
@@ -70,6 +74,16 @@ export default function DesignPreview() {
         }
     }, [params, showToast])
     const [showPass, setShowPass] = useState(false)
+    // Montagem manual dos grupos (D7): mesmo DraftZone/MovingBar do Gerenciar, com dados de exemplo
+    const DRAFT_IDS = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6']
+    const [draft, setDraft] = useState<GroupDraft>({ groups: [['p1', 'p3'], ['p2']], pool: ['p4', 'p5', 'p6'] })
+    const [movingPid, setMovingPid] = useState<string | null>(() => params.get('draft') === 'moving' ? 'p4' : null)
+    const draftNames: Record<string, string> = { p1: 'enzo', p2: 'lucas', p3: 'pedro', p4: 'joão', p5: 'rafa', p6: 'gabriel' }
+    const draftName = (pid: string) => draftNames[pid] ?? '?'
+    function draftMove(playerId: string, target: DraftTarget) {
+        setDraft(prev => moveInDraft(prev, playerId, target))
+        setMovingPid(null)
+    }
     const [loading, setLoading] = useState(false)
 
     return (
@@ -361,6 +375,39 @@ export default function DesignPreview() {
                         <KnockoutBracket matches={DEMO_KO} players={DEMO_PLAYERS} isAdmin onSelectMatch={() => setModal('score')} />
                         <ChampionCard name="enzo" onCelebrate={() => showToast('Celebrar (demonstração)', 'info')} />
                     </div>
+                </Section>
+
+                {/* ---------------------------------------------------------- Gerenciar (D7) */}
+                <Section title="Gerenciar | montagem manual dos grupos (interativo)">
+                    <div className="w-[390px] max-w-full flex flex-col gap-3">
+                        <p className="text-body text-secondary">
+                            {movingPid
+                                ? `Toque no grupo para onde mover ${draftName(movingPid)}.`
+                                : 'Para ajustar, toque num jogador e depois no grupo de destino (ou arraste).'}
+                        </p>
+                        {draft.pool.length > 0 && (
+                            <DraftZone target={POOL} title="Sem grupo" ids={draft.pool} movingPid={movingPid}
+                                setMovingPid={setMovingPid} moveTo={draftMove} getPlayerName={draftName} />
+                        )}
+                        <div className="grid grid-cols-2 gap-2">
+                            {draft.groups.map((group, i) => (
+                                <DraftZone key={i} target={i} title={`Grupo ${'AB'[i]}`} ids={group} movingPid={movingPid}
+                                    setMovingPid={setMovingPid} moveTo={draftMove} getPlayerName={draftName} />
+                            ))}
+                        </div>
+                        {draftProblem(draft, DRAFT_IDS) && <Alert tone="warning">{draftProblem(draft, DRAFT_IDS)}</Alert>}
+                        <div className="grid grid-cols-2 gap-2">
+                            <Button variant="secondary" icon={<Shuffle size={16} />} onClick={() => {
+                                const b: string[][] = [[], []]
+                                shuffle(DRAFT_IDS).forEach((pid, i) => b[i % 2].push(pid))
+                                setDraft({ groups: b, pool: [] }); setMovingPid(null)
+                            }}>Sortear</Button>
+                            <Button variant="secondary" onClick={() => { setDraft(emptyDraft(2, DRAFT_IDS)); setMovingPid(null) }}>
+                                Montar do zero
+                            </Button>
+                        </div>
+                    </div>
+                    {movingPid && <MovingBar name={draftName(movingPid)} onCancel={() => setMovingPid(null)} />}
                 </Section>
 
                 {/* ---------------------------------------------------------- Modal + Toast */}

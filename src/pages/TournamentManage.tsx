@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react'
+import { Link, useParams, useNavigate } from 'react-router-dom'
 import { supabase, check } from '../lib/supabase'
 import { STATUS_LABEL } from '../lib/labels'
 import { shuffle } from '../lib/shuffle'
@@ -7,8 +7,16 @@ import { POOL, draftProblem, emptyDraft, moveInDraft, type DraftTarget, type Gro
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../hooks/useToast'
 import type { Tournament, Profile, TournamentPlayer } from '../types'
-import { ArrowLeft, Users, AlertTriangle, Shuffle, UserMinus, RefreshCw, X, Check, Hand } from 'lucide-react'
+import { ArrowLeft, Users, AlertTriangle, Shuffle, UserMinus, X, Check, Hand, Lock, Plus, MousePointerClick } from 'lucide-react'
 import { Skeleton } from '../components/Skeleton'
+import Button from '../components/ui/Button'
+import Badge from '../components/ui/Badge'
+import Modal from '../components/ui/Modal'
+import Alert from '../components/ui/Alert'
+import Avatar from '../components/ui/Avatar'
+import { Card, CardBody, CardHeader } from '../components/ui/Card'
+import { buttonClasses } from '../components/ui/variants'
+import { cx } from '../lib/cx'
 
 type Duo = { p1: string; p2: string }
 
@@ -409,11 +417,17 @@ export default function TournamentManage() {
 
     if (authLoading || loading) {
         return (
-            <div className="min-h-screen p-6">
-                <div className="max-w-2xl mx-auto flex flex-col gap-4">
-                    <Skeleton className="h-6 w-40" />
-                    <Skeleton className="h-32 w-full rounded-xl" />
-                    <Skeleton className="h-48 w-full rounded-xl" />
+            <div className="px-4 pt-4 pb-6 sm:px-6">
+                <div className="max-w-2xl mx-auto flex flex-col gap-5">
+                    <div className="flex items-center gap-3">
+                        <Skeleton className="h-11 w-11 rounded-card" />
+                        <div className="flex-1 flex flex-col gap-2">
+                            <Skeleton className="h-7 w-40" />
+                            <Skeleton className="h-4 w-56" />
+                        </div>
+                    </div>
+                    <Skeleton className="h-28 w-full rounded-card" />
+                    <Skeleton className="h-64 w-full rounded-card" />
                 </div>
             </div>
         )
@@ -427,49 +441,17 @@ export default function TournamentManage() {
 
     // Um grupo (ou "Sem grupo") da prévia: recebe o jogador tocado ou arrastado
     function renderDraftZone(target: DraftTarget, title: string, ids: string[]) {
-        const canReceive = movingPid !== null && !ids.includes(movingPid)
         return (
-            <div
+            <DraftZone
                 key={String(target)}
-                onClick={() => canReceive && moveTo(movingPid!, target)}
-                onDragOver={e => e.preventDefault()}
-                onDrop={e => {
-                    e.preventDefault()
-                    const pid = e.dataTransfer.getData('text/plain')
-                    if (pid) moveTo(pid, target)
-                }}
-                className={`rounded-lg border px-3 py-2 transition ${canReceive ? 'cursor-pointer' : ''}`}
-                style={canReceive
-                    ? { borderColor: 'var(--color-gold)', borderStyle: 'dashed', backgroundColor: 'rgba(201,153,42,0.18)' }
-                    : { borderColor: 'rgba(201,153,42,0.4)', backgroundColor: 'rgba(201,153,42,0.08)' }}
-            >
-                <p className="text-xs font-bold mb-1 flex items-center justify-between gap-1" style={{ color: 'var(--color-gold)' }}>
-                    <span>{title} <span className="text-white/40 font-normal">({ids.length})</span></span>
-                    {canReceive && <span className="text-[10px] font-normal text-white/60">mover para cá</span>}
-                </p>
-                {ids.map(pid => (
-                    <button
-                        key={pid}
-                        type="button"
-                        draggable
-                        onDragStart={e => { e.dataTransfer.setData('text/plain', pid); setMovingPid(pid) }}
-                        onDragEnd={() => setMovingPid(null)}
-                        onClick={e => {
-                            // Com outro jogador escolhido, tocar em alguém de outro grupo move para cá
-                            if (canReceive) return
-                            e.stopPropagation()
-                            setMovingPid(prev => prev === pid ? null : pid)
-                        }}
-                        className="w-full text-left text-xs truncate py-1 px-1.5 rounded transition cursor-grab"
-                        style={movingPid === pid
-                            ? { backgroundColor: 'var(--color-gold)', color: 'var(--color-green)', fontWeight: 700 }
-                            : { color: 'white' }}
-                    >
-                        {getPlayerName(pid)}
-                    </button>
-                ))}
-                {ids.length === 0 && <p className="text-white/25 text-xs italic py-1">vazio</p>}
-            </div>
+                target={target}
+                title={title}
+                ids={ids}
+                movingPid={movingPid}
+                setMovingPid={setMovingPid}
+                moveTo={moveTo}
+                getPlayerName={getPlayerName}
+            />
         )
     }
     // Mesma regra do can_edit_tournament no banco: encerrado só o supreme edita
@@ -489,223 +471,176 @@ export default function TournamentManage() {
     })
 
     return (
-        <div className="min-h-screen p-6">
-            <div className="max-w-2xl mx-auto">
+        <div className="px-4 pt-4 pb-6 sm:px-6">
+            <div className="max-w-2xl mx-auto flex flex-col gap-5">
 
-                {/* Header */}
-                <div className="flex items-center gap-3 mb-8">
-                    <button onClick={() => navigate(`/tournament/${id}`)}
-                        className="p-2 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition">
-                        <ArrowLeft size={20} />
-                    </button>
-                    <div>
-                        <h1 className="text-xl font-bold text-white">Gerenciar</h1>
-                        <p className="text-white/30 text-xs mt-0.5 truncate">{tournament.name}</p>
+                {/* Cabeçalho */}
+                <header className="flex items-start gap-2">
+                    <Link
+                        to={`/tournament/${id}`}
+                        aria-label="Voltar para o campeonato"
+                        className={buttonClasses({ variant: 'ghost', size: 'icon', className: '-ml-2 flex-shrink-0' })}
+                    >
+                        <ArrowLeft size={22} />
+                    </Link>
+                    <div className="flex-1 min-w-0 pt-1">
+                        <h1 className="font-display font-bold text-headline uppercase tracking-wide leading-tight">Gerenciar</h1>
+                        <p className="text-body text-muted truncate">{tournament.name}</p>
                     </div>
-                </div>
+                </header>
 
                 {/* Status */}
-                <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden mb-6">
-                    <div className="px-4 py-3 border-b border-white/10" style={{ backgroundColor: 'rgba(201,153,42,0.08)' }}>
-                        <h2 className="font-bold text-sm" style={{ color: 'var(--color-gold)' }}>Status do Campeonato</h2>
-                    </div>
-                    <div className="px-4 py-4">
-                        <div className="flex gap-2">
+                <Card>
+                    <CardHeader title="Status do campeonato" />
+                    <CardBody>
+                        <div role="radiogroup" aria-label="Status do campeonato" className="grid grid-cols-3 gap-1 p-1 rounded-card bg-fill border border-subtle">
                             {(['setup', 'active', 'finished'] as Tournament['status'][]).map(s => (
-                                <button key={s} onClick={() => handleSetStatus(s)}
+                                <button key={s} type="button" role="radio" aria-checked={tournament.status === s}
+                                    onClick={() => handleSetStatus(s)}
                                     disabled={working || tournament.status === s}
-                                    className="flex-1 py-2 rounded-lg text-xs font-bold transition border"
-                                    style={tournament.status === s
-                                        ? { backgroundColor: 'var(--color-gold)', color: 'var(--color-green)', borderColor: 'var(--color-gold)' }
-                                        : { backgroundColor: 'transparent', color: 'rgba(255,255,255,0.4)', borderColor: 'rgba(255,255,255,0.15)' }
-                                    }>
+                                    className={cx(
+                                        'min-h-11 px-1 rounded-control text-caption sm:text-body font-semibold transition-colors leading-tight',
+                                        tournament.status === s
+                                            ? 'bg-brand text-on-brand shadow-sm disabled:opacity-100 disabled:cursor-default'
+                                            : 'text-secondary hover:text-primary hover:bg-fill-strong disabled:opacity-50',
+                                    )}>
                                     {STATUS_LABEL[s]}
                                 </button>
                             ))}
                         </div>
-                    </div>
-                </div>
+                    </CardBody>
+                </Card>
 
                 {locked && (
-                    <div className="mb-6 px-4 py-3 rounded-xl text-sm text-yellow-400 bg-yellow-400/10 border border-yellow-400/20">
-                        🔒 Campeonato encerrado. Para editar jogadores, duplas ou partidas, volte o status para "Em andamento".
-                    </div>
+                    <Alert tone="warning">
+                        <span className="inline-flex items-center gap-1.5 font-semibold"><Lock size={14} aria-hidden /> Campeonato encerrado.</span>{' '}
+                        Para editar jogadores, duplas ou partidas, volte o status para "Em andamento".
+                    </Alert>
                 )}
 
                 {/* Jogadores */}
-                <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden mb-6">
-                    <div className="px-4 py-3 border-b border-white/10" style={{ backgroundColor: 'rgba(201,153,42,0.08)' }}>
-                        <div className="flex items-center justify-between">
-                            <h2 className="font-bold text-sm" style={{ color: 'var(--color-gold)' }}>Jogadores</h2>
-                            <span className="text-white/40 text-xs">{players.length} total</span>
-                        </div>
-                    </div>
+                <Card>
+                    <CardHeader title="Jogadores" action={<Badge size="md">{players.length} total</Badge>} />
                     {players.length === 0 ? (
-                        <div className="px-4 py-6 text-center">
-                            <Users size={32} className="mx-auto mb-2 text-white/10" />
-                            <p className="text-white/30 text-sm">Nenhum jogador ainda.</p>
-                            <p className="text-white/20 text-xs mt-1">Código: <span className="font-mono font-bold text-white/30">{tournament.invite_code}</span></p>
-                        </div>
+                        <CardBody className="flex flex-col items-center text-center gap-2 py-8">
+                            <Users size={32} className="text-faint" aria-hidden />
+                            <p className="text-body text-muted">Nenhum jogador ainda.</p>
+                            <p className="text-caption text-muted">
+                                Código: <span className="font-display font-bold text-body-lg tracking-[0.2em] text-primary">{tournament.invite_code}</span>
+                            </p>
+                        </CardBody>
                     ) : (
-                        <div className="flex flex-col">
+                        <div>
                             {players.map(tp => (
-                                <div key={tp.player_id} className="flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0">
-                                    <div className="w-8 h-8 rounded-full overflow-hidden bg-white/10 flex-shrink-0 flex items-center justify-center border"
-                                        style={{ borderColor: 'var(--color-gold)' }}>
-                                        {tp.profile?.avatar_url
-                                            ? <img src={tp.profile.avatar_url} alt="" className="w-full h-full object-cover" />
-                                            : <span className="text-white/40 text-sm font-bold">{tp.profile?.name?.charAt(0) ?? '?'}</span>
-                                        }
-                                    </div>
+                                <div key={tp.player_id} className="flex items-center gap-3 px-card py-2.5 min-h-14 border-b border-subtle last:border-0">
+                                    <Avatar src={tp.profile?.avatar_url} name={tp.profile?.name} size="sm" />
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-white text-sm font-medium truncate">{tp.profile?.name}</p>
-                                        {tp.profile?.username && <p className="text-white/40 text-xs">@{tp.profile.username}</p>}
+                                        <p className="text-body font-semibold text-primary truncate">{tp.profile?.name}</p>
+                                        {tp.profile?.username && <p className="text-caption text-muted truncate">@{tp.profile.username}</p>}
                                     </div>
                                     {!locked && (
-                                        <button onClick={() => handleRemovePlayer(tp.player_id)}
-                                            className="p-1.5 rounded border border-red-500/20 text-red-400/50 hover:text-red-400 hover:border-red-500/50 transition flex-shrink-0">
-                                            <UserMinus size={13} />
+                                        <button type="button" onClick={() => handleRemovePlayer(tp.player_id)}
+                                            aria-label={`Remover ${getPlayerName(tp.player_id)}`}
+                                            className="h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-control border border-danger-border text-danger hover:bg-danger-subtle transition-colors">
+                                            <UserMinus size={16} />
                                         </button>
                                     )}
                                 </div>
                             ))}
                         </div>
                     )}
-                </div>
+                </Card>
 
                 {/* Duplas - só para 2v2 */}
                 {is2v2 && !locked && (
-                    <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden mb-6">
-                        <div className="px-4 py-3 border-b border-white/10" style={{ backgroundColor: 'rgba(201,153,42,0.08)' }}>
-                            <div className="flex items-center justify-between">
-                                <h2 className="font-bold text-sm" style={{ color: 'var(--color-gold)' }}>Duplas</h2>
+                    <Card>
+                        <CardHeader
+                            title="Duplas"
+                            action={
                                 <div className="flex gap-2">
-                                    <button onClick={handleShuffleDuos}
-                                        className="flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold border border-white/20 text-white/60 hover:text-white transition">
-                                        <Shuffle size={12} /> Sortear
-                                    </button>
-                                    <button onClick={handleAddDuo}
-                                        className="flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold border border-white/20 text-white/60 hover:text-white transition">
-                                        + Dupla
-                                    </button>
+                                    <Button variant="secondary" size="sm" icon={<Shuffle size={14} />} onClick={handleShuffleDuos}>Sortear</Button>
+                                    <Button variant="secondary" size="sm" icon={<Plus size={14} />} onClick={handleAddDuo}>Dupla</Button>
                                 </div>
-                            </div>
-                        </div>
-
-                        <div className="px-4 py-4 flex flex-col gap-3">
+                            }
+                        />
+                        <CardBody className="flex flex-col gap-3">
                             {duos.length === 0 ? (
-                                <p className="text-white/30 text-sm text-center py-4">
+                                <p className="text-body text-muted text-center py-4">
                                     Nenhuma dupla definida. Use "Sortear" ou "+ Dupla".
                                 </p>
                             ) : duos.map((duo, i) => (
                                 <div key={i} className="flex items-center gap-2">
-                                    <span className="text-white/30 text-xs w-4 text-center">{i + 1}</span>
+                                    <span className="w-5 text-center font-display font-bold text-body-lg tabular-nums text-muted">{i + 1}</span>
 
-                                    {/* Player 1 */}
+                                    {/* Jogador 1 */}
                                     <button
+                                        type="button"
                                         onClick={() => setSelectingFor({ duoIndex: i, slot: 1 })}
-                                        className="flex-1 px-3 py-2 rounded-lg text-sm text-left transition border"
-                                        style={duo.p1
-                                            ? { backgroundColor: 'rgba(201,153,42,0.1)', borderColor: 'rgba(201,153,42,0.3)', color: 'white' }
-                                            : { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.3)' }
-                                        }
+                                        className={cx(
+                                            'flex-1 min-w-0 min-h-11 px-3 rounded-control text-body text-left truncate transition-colors border',
+                                            duo.p1 ? 'bg-brand-subtle border-accent text-primary' : 'bg-fill border-default text-muted',
+                                            selectingFor?.duoIndex === i && selectingFor.slot === 1 && 'ring-2 ring-focus',
+                                        )}
                                     >
                                         {duo.p1 ? getPlayerName(duo.p1) : 'Selecionar...'}
                                     </button>
 
-                                    <span className="text-white/30 text-xs">&</span>
+                                    <span className="text-muted text-body font-bold" aria-hidden>&amp;</span>
 
-                                    {/* Player 2 */}
+                                    {/* Jogador 2 */}
                                     <button
+                                        type="button"
                                         onClick={() => setSelectingFor({ duoIndex: i, slot: 2 })}
-                                        className="flex-1 px-3 py-2 rounded-lg text-sm text-left transition border"
-                                        style={duo.p2
-                                            ? { backgroundColor: 'rgba(201,153,42,0.1)', borderColor: 'rgba(201,153,42,0.3)', color: 'white' }
-                                            : { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.3)' }
-                                        }
+                                        className={cx(
+                                            'flex-1 min-w-0 min-h-11 px-3 rounded-control text-body text-left truncate transition-colors border',
+                                            duo.p2 ? 'bg-brand-subtle border-accent text-primary' : 'bg-fill border-default text-muted',
+                                            selectingFor?.duoIndex === i && selectingFor.slot === 2 && 'ring-2 ring-focus',
+                                        )}
                                     >
                                         {duo.p2 ? getPlayerName(duo.p2) : 'Selecionar...'}
                                     </button>
 
-                                    <button onClick={() => handleRemoveDuo(i)}
-                                        className="p-1.5 rounded border border-red-500/20 text-red-400/50 hover:text-red-400 transition flex-shrink-0">
-                                        <X size={13} />
+                                    <button type="button" onClick={() => handleRemoveDuo(i)}
+                                        aria-label={`Remover dupla ${i + 1}`}
+                                        className="h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-control text-danger hover:bg-danger-subtle transition-colors">
+                                        <X size={18} />
                                     </button>
                                 </div>
                             ))}
 
                             {duos.length > 0 && (
-                                <button
-                                    onClick={handleSaveDuos}
-                                    disabled={working}
-                                    className="w-full mt-2 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition text-sm"
-                                    style={{ backgroundColor: 'rgba(201,153,42,0.2)', color: 'var(--color-gold)', border: '1px solid rgba(201,153,42,0.4)' }}
-                                >
-                                    {working ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} />}
+                                <Button variant="secondary" fullWidth className="mt-1" onClick={handleSaveDuos} loading={working} icon={<Check size={16} />}>
                                     {working ? 'Salvando...' : 'Confirmar Duplas'}
-                                </button>
+                                </Button>
                             )}
 
                             {savedDuos.length > 0 && (
-                                <p className="text-green-400 text-xs text-center">
-                                    ✓ {savedDuos.length} dupla{savedDuos.length !== 1 ? 's' : ''} confirmada{savedDuos.length !== 1 ? 's' : ''}
+                                <p className="flex items-center justify-center gap-1.5 text-caption text-success">
+                                    <Check size={14} aria-hidden />
+                                    {savedDuos.length} dupla{savedDuos.length !== 1 ? 's' : ''} confirmada{savedDuos.length !== 1 ? 's' : ''}
                                 </p>
                             )}
-                        </div>
-
-                        {/* Modal de seleção de jogador */}
-                        {selectingFor && (
-                            <div className="px-4 pb-4">
-                                <div className="rounded-xl border border-white/20 bg-white/5 overflow-hidden">
-                                    <div className="px-4 py-2 border-b border-white/10 flex items-center justify-between">
-                                        <p className="text-white/60 text-xs font-bold uppercase tracking-wider">
-                                            Selecionar jogador | Dupla {selectingFor.duoIndex + 1}, Slot {selectingFor.slot}
-                                        </p>
-                                        <button onClick={() => setSelectingFor(null)} className="text-white/40 hover:text-white transition">
-                                            <X size={14} />
-                                        </button>
-                                    </div>
-                                    <div className="flex flex-col max-h-48 overflow-y-auto">
-                                        {availableForSelection.map(pid => (
-                                            <button
-                                                key={pid}
-                                                onClick={() => handleSelectPlayer(pid)}
-                                                className="px-4 py-2.5 text-left text-sm text-white hover:bg-white/10 transition border-b border-white/5 last:border-0"
-                                            >
-                                                {getPlayerName(pid)}
-                                            </button>
-                                        ))}
-                                        {availableForSelection.length === 0 && (
-                                            <p className="text-white/30 text-sm text-center py-4">Nenhum jogador disponível.</p>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                        </CardBody>
+                    </Card>
                 )}
 
                 {!locked && (<>
                 {/* Gerar partidas */}
-                <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden mb-6">
-                    <div className="px-4 py-3 border-b border-white/10" style={{ backgroundColor: 'rgba(201,153,42,0.08)' }}>
-                        <h2 className="font-bold text-sm" style={{ color: 'var(--color-gold)' }}>Gerar Partidas</h2>
-                    </div>
-                    <div className="px-4 py-4 flex flex-col gap-3">
+                <Card>
+                    <CardHeader title="Gerar partidas" />
+                    <CardBody className="flex flex-col gap-4">
                         {is2v2 && savedDuos.length === 0 && (
-                            <div className="px-3 py-2 rounded-lg text-xs text-yellow-400 bg-yellow-400/10 border border-yellow-400/20">
-                                ⚠️ Confirme as duplas primeiro antes de gerar partidas.
-                            </div>
+                            <Alert tone="warning">Confirme as duplas primeiro antes de gerar partidas.</Alert>
                         )}
                         {is2v2 && savedDuos.length > 0 && (
-                            <p className="text-white/40 text-sm">
+                            <p className="text-body text-secondary">
                                 {savedDuos.length} dupla{savedDuos.length !== 1 ? 's' : ''} · {
                                     tournament.format === 'league_final' ? 'Liga completa + Final' : 'Liga'
                                 }
                             </p>
                         )}
                         {!is2v2 && (
-                            <p className="text-white/40 text-sm">
+                            <p className="text-body text-secondary">
                                 {players.length} jogadores · {
                                     tournament.format === 'groups_knockout'
                                         ? (planGroups(players.length) !== null
@@ -715,17 +650,17 @@ export default function TournamentManage() {
                                 }
                             </p>
                         )}
+
                         {/* Grupos + mata-mata: sortear ou montar à mão → revisar/ajustar na tela → confirmar e gravar */}
                         {isGroupsKO && !draft && savedGroups.length > 0 && (
                             <div>
-                                <p className="text-xs font-bold uppercase tracking-wider mb-2 text-white/40">Grupos atuais</p>
+                                <p className="text-label uppercase text-muted mb-2">Grupos atuais</p>
                                 <div className="grid grid-cols-2 gap-2">
                                     {savedGroups.map((group, i) => (
-                                        <div key={i} className="rounded-lg border px-3 py-2"
-                                            style={{ borderColor: 'rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.03)' }}>
-                                            <p className="text-xs font-bold mb-1" style={{ color: 'var(--color-gold)' }}>{groupName(i)}</p>
+                                        <div key={i} className="rounded-card bg-fill border border-subtle p-3">
+                                            <p className="font-display font-bold text-title uppercase tracking-wide text-brand-text mb-1">{groupName(i)}</p>
                                             {group.map(pid => (
-                                                <p key={pid} className="text-white text-xs truncate py-0.5">{getPlayerName(pid)}</p>
+                                                <p key={pid} className="text-body text-primary truncate py-0.5">{getPlayerName(pid)}</p>
                                             ))}
                                         </div>
                                     ))}
@@ -734,17 +669,18 @@ export default function TournamentManage() {
                         )}
 
                         {isGroupsKO && draft && (
-                            <div>
-                                <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--color-gold)' }}>
-                                    Prévia - ainda não gravado
-                                </p>
-                                <p className="text-white/40 text-xs mb-2">
+                            <div className="flex flex-col gap-2">
+                                <div className="flex items-center gap-2">
+                                    <Badge tone="brand">Prévia</Badge>
+                                    <span className="text-caption text-muted">ainda não gravado</span>
+                                </div>
+                                <p className="text-body text-secondary">
                                     {movingPid
                                         ? `Toque no grupo para onde mover ${getPlayerName(movingPid)}.`
                                         : 'Para ajustar, toque num jogador e depois no grupo de destino (ou arraste).'}
                                 </p>
                                 {draft.pool.length > 0 && (
-                                    <div className="mb-2">{renderDraftZone(POOL, 'Sem grupo', draft.pool)}</div>
+                                    <div>{renderDraftZone(POOL, 'Sem grupo', draft.pool)}</div>
                                 )}
                                 <div className="grid grid-cols-2 gap-2">
                                     {draft.groups.map((group, i) => renderDraftZone(i, groupName(i), group))}
@@ -754,122 +690,210 @@ export default function TournamentManage() {
 
                         {isGroupsKO && (draft ? (
                             <>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={handleDrawGroups}
-                                        disabled={working}
-                                        className="flex-1 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 border border-white/20 text-white/70 hover:text-white transition disabled:opacity-40"
-                                    >
-                                        <Shuffle size={14} /> Sortear de novo
-                                    </button>
-                                    <button
-                                        onClick={handleManualGroups}
-                                        disabled={working}
-                                        className="flex-1 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 border border-white/20 text-white/70 hover:text-white transition disabled:opacity-40"
-                                    >
-                                        <Hand size={14} /> Montar do zero
-                                    </button>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Button variant="secondary" icon={<Shuffle size={16} />} onClick={handleDrawGroups} disabled={working}>
+                                        Sortear de novo
+                                    </Button>
+                                    <Button variant="secondary" icon={<Hand size={16} />} onClick={handleManualGroups} disabled={working}>
+                                        Montar do zero
+                                    </Button>
                                 </div>
-                                {draftError && (
-                                    <p className="px-3 py-2 rounded-lg text-xs text-yellow-400 bg-yellow-400/10 border border-yellow-400/20">
-                                        {draftError}
-                                    </p>
-                                )}
-                                <button
-                                    onClick={handleGenerateMatches}
-                                    disabled={working || !!draftError}
-                                    className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-40"
-                                    style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
-                                >
-                                    {working ? <RefreshCw size={16} className="animate-spin" /> : <Check size={16} />}
+                                {draftError && <Alert tone="warning">{draftError}</Alert>}
+                                <Button fullWidth size="lg" icon={<Check size={18} />} onClick={handleGenerateMatches}
+                                    disabled={working || !!draftError} loading={working}>
                                     {working ? 'Gerando...' : 'Confirmar e gerar'}
-                                </button>
-                                <p className="text-white/30 text-xs text-center">
+                                </Button>
+                                <p className="text-caption text-muted text-center">
                                     {savedGroups.length > 0
                                         ? 'Confirmar substitui os grupos atuais e apaga as partidas já geradas.'
                                         : 'Nada é gravado até você confirmar.'}
                                 </p>
                             </>
                         ) : (
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={handleDrawGroups}
-                                    disabled={working || planGroups(players.length) === null}
-                                    className="flex-1 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-40"
-                                    style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
-                                >
-                                    <Shuffle size={16} />
+                            <div className="grid grid-cols-2 gap-2">
+                                <Button icon={<Shuffle size={16} />} onClick={handleDrawGroups}
+                                    disabled={working || planGroups(players.length) === null}>
                                     {savedGroups.length > 0 ? 'Sortear novos grupos' : 'Sortear grupos'}
-                                </button>
-                                <button
-                                    onClick={handleManualGroups}
-                                    disabled={working || planGroups(players.length) === null}
-                                    className="flex-1 py-3 rounded-xl font-bold flex items-center justify-center gap-2 border border-white/20 text-white/70 hover:text-white transition disabled:opacity-40"
-                                >
-                                    <Hand size={16} /> Montar à mão
-                                </button>
+                                </Button>
+                                <Button variant="secondary" icon={<Hand size={16} />} onClick={handleManualGroups}
+                                    disabled={working || planGroups(players.length) === null}>
+                                    Montar à mão
+                                </Button>
                             </div>
                         ))}
 
                         {!isGroupsKO && (
-                            <button
-                                onClick={handleGenerateMatches}
+                            <Button fullWidth size="lg" icon={<Shuffle size={18} />} onClick={handleGenerateMatches}
                                 disabled={working || (is2v2 && savedDuos.length < 2) || (!is2v2 && players.length < 2)}
-                                className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-40"
-                                style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
-                            >
-                                {working ? <RefreshCw size={16} className="animate-spin" /> : <Shuffle size={16} />}
+                                loading={working}>
                                 {working ? 'Gerando...' : 'Gerar / Regerar Partidas'}
-                            </button>
+                            </Button>
                         )}
-                    </div>
-                </div>
+                    </CardBody>
+                </Card>
 
-                {/* Zona de Perigo */}
-                <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(239,68,68,0.4)' }}>
-                    <div className="px-4 py-3 border-b flex items-center gap-2"
-                        style={{ backgroundColor: '#1a0a0a', borderColor: 'rgba(239,68,68,0.4)' }}>
-                        <AlertTriangle size={14} className="text-red-400" />
-                        <h2 className="font-bold text-sm text-red-400">Zona de Perigo</h2>
+                {/* Zona de perigo */}
+                <Card className="border-danger-border">
+                    <div className="flex items-center gap-2 px-card py-3 bg-danger-subtle border-b border-danger-border">
+                        <AlertTriangle size={18} className="text-danger" aria-hidden />
+                        <h2 className="font-display font-bold text-title uppercase tracking-wide text-danger">Zona de perigo</h2>
                     </div>
-                    <div className="px-4 py-5" style={{ backgroundColor: '#0d0d0d' }}>
-                        <p className="text-white/40 text-sm mb-4">
+                    <CardBody className="flex flex-col gap-3">
+                        <p className="text-body text-secondary">
                             Apaga todas as partidas, grupos e duplas. Jogadores permanecem no campeonato.
                         </p>
-                        {!showResetConfirm ? (
-                            <button onClick={() => setShowResetConfirm(true)}
-                                className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition"
-                                style={{ border: '1px solid rgba(239,68,68,0.5)', color: 'rgb(248,113,113)', backgroundColor: 'rgba(239,68,68,0.1)' }}
-                                onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.2)')}
-                                onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.1)')}>
-                                <AlertTriangle size={15} />
-                                Resetar Campeonato
-                            </button>
-                        ) : (
-                            <div className="flex flex-col gap-3">
-                                <div className="px-4 py-3 rounded-xl text-center"
-                                    style={{ backgroundColor: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)' }}>
-                                    <p className="text-red-400 font-bold text-sm">⚠️ Tem certeza?</p>
-                                    <p className="text-red-300/70 text-xs mt-1">Todos os resultados serão perdidos.</p>
-                                </div>
-                                <div className="flex gap-3">
-                                    <button onClick={() => setShowResetConfirm(false)}
-                                        className="flex-1 py-3 rounded-xl text-white border border-white/20 hover:bg-white/10 transition font-medium text-sm">
-                                        Cancelar
-                                    </button>
-                                    <button onClick={handleReset} disabled={working}
-                                        className="flex-1 py-3 rounded-xl font-bold text-white text-sm transition"
-                                        style={{ backgroundColor: 'rgb(220,38,38)' }}>
-                                        {working ? 'Resetando...' : 'Confirmar'}
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                        <Button variant="danger" fullWidth icon={<AlertTriangle size={16} />} onClick={() => setShowResetConfirm(true)}>
+                            Resetar Campeonato
+                        </Button>
+                    </CardBody>
+                </Card>
                 </>)}
 
             </div>
+
+            {/* Barra fixa enquanto um jogador está escolhido na montagem dos grupos:
+                a instrução do topo some ao rolar até o grupo de destino no celular */}
+            {isGroupsKO && draft && movingPid && (
+                <MovingBar name={getPlayerName(movingPid)} onCancel={() => setMovingPid(null)} />
+            )}
+
+            {/* Escolha de jogador para a vaga da dupla */}
+            {selectingFor && (
+                <Modal
+                    open
+                    onClose={() => setSelectingFor(null)}
+                    title="Selecionar jogador"
+                    description={`Dupla ${selectingFor.duoIndex + 1}, Slot ${selectingFor.slot}`}
+                >
+                    <div className="flex flex-col -mx-2">
+                        {availableForSelection.map(pid => {
+                            const tp = players.find(p => p.player_id === pid)
+                            return (
+                                <button
+                                    key={pid}
+                                    type="button"
+                                    onClick={() => handleSelectPlayer(pid)}
+                                    className="flex items-center gap-3 min-h-12 px-2 rounded-control text-left text-body text-primary hover:bg-fill-strong transition-colors"
+                                >
+                                    <Avatar src={tp?.profile?.avatar_url} name={getPlayerName(pid)} size="sm" />
+                                    <span className="truncate">{getPlayerName(pid)}</span>
+                                </button>
+                            )
+                        })}
+                        {availableForSelection.length === 0 && (
+                            <p className="text-body text-muted text-center py-4">Nenhum jogador disponível.</p>
+                        )}
+                    </div>
+                </Modal>
+            )}
+
+            {/* Confirmação do reset */}
+            <Modal
+                open={showResetConfirm}
+                onClose={() => setShowResetConfirm(false)}
+                title="Resetar campeonato?"
+                dismissible={!working}
+                footer={<>
+                    <Button variant="secondary" onClick={() => setShowResetConfirm(false)}>Cancelar</Button>
+                    <Button variant="danger" onClick={handleReset} loading={working}>
+                        {working ? 'Resetando...' : 'Confirmar'}
+                    </Button>
+                </>}
+            >
+                <Alert>Todos os resultados serão perdidos.</Alert>
+                <p className="text-body text-secondary mt-3">
+                    Apaga todas as partidas, grupos e duplas. Jogadores permanecem no campeonato.
+                </p>
+            </Modal>
+        </div>
+    )
+}
+
+// Grupo da prévia (ou "Sem grupo"). No celular: fichas de 44px e o card inteiro vira alvo
+// quando há jogador escolhido. Exportado para a vitrine /design.
+export function DraftZone({ target, title, ids, movingPid, setMovingPid, moveTo, getPlayerName }: {
+    target: DraftTarget
+    title: string
+    ids: string[]
+    movingPid: string | null
+    setMovingPid: Dispatch<SetStateAction<string | null>>
+    moveTo: (playerId: string, target: DraftTarget) => void
+    getPlayerName: (pid: string) => string
+}) {
+    const canReceive = movingPid !== null && !ids.includes(movingPid)
+    return (
+        <div
+            onClick={() => canReceive && moveTo(movingPid!, target)}
+            onDragOver={e => e.preventDefault()}
+            onDrop={e => {
+                e.preventDefault()
+                const pid = e.dataTransfer.getData('text/plain')
+                if (pid) moveTo(pid, target)
+            }}
+            className={cx(
+                'rounded-card border-2 p-2 flex flex-col gap-1.5 transition-colors',
+                canReceive
+                    ? 'border-dashed border-brand bg-brand-muted cursor-pointer'
+                    : 'border-transparent bg-fill',
+            )}
+        >
+            <div className="flex items-center justify-between gap-1 px-1 pt-0.5">
+                <span className="font-display font-bold text-title uppercase tracking-wide text-brand-text">{title}</span>
+                <span className="font-display font-bold text-body-lg tabular-nums text-muted">{ids.length}</span>
+            </div>
+            {canReceive && (
+                <span className="flex items-center justify-center gap-1.5 h-9 rounded-control bg-brand text-on-brand text-caption font-bold">
+                    <MousePointerClick size={14} aria-hidden /> Mover para cá
+                </span>
+            )}
+            {ids.map(pid => (
+                <button
+                    key={pid}
+                    type="button"
+                    draggable
+                    aria-pressed={movingPid === pid}
+                    onDragStart={e => { e.dataTransfer.setData('text/plain', pid); setMovingPid(pid) }}
+                    onDragEnd={() => setMovingPid(null)}
+                    onClick={e => {
+                        // Com outro jogador escolhido, tocar em alguém de outro grupo move para cá
+                        if (canReceive) return
+                        e.stopPropagation()
+                        setMovingPid(prev => prev === pid ? null : pid)
+                    }}
+                    className={cx(
+                        'w-full min-h-11 px-3 rounded-control text-left text-body truncate transition-colors cursor-grab select-none',
+                        movingPid === pid
+                            ? 'bg-brand text-on-brand font-bold shadow-md ring-2 ring-brand-hover'
+                            : 'bg-surface border border-subtle text-primary hover:border-strong',
+                    )}
+                >
+                    {getPlayerName(pid)}
+                </button>
+            ))}
+            {ids.length === 0 && !canReceive && (
+                <p className="text-caption italic text-faint px-1 py-2">vazio</p>
+            )}
+        </div>
+    )
+}
+
+// Barra fixa enquanto um jogador está escolhido na montagem dos grupos: no celular a
+// instrução do topo some ao rolar até o grupo de destino. Fica acima da BottomNav.
+export function MovingBar({ name, onCancel }: { name: string; onCancel: () => void }) {
+    return (
+        <div
+            role="status"
+            className="fixed inset-x-4 z-40 md:inset-x-auto md:right-6 md:w-96 bottom-[calc(7.5rem+env(safe-area-inset-bottom))] md:bottom-6 flex items-center gap-3 pl-4 pr-2 py-2 rounded-card bg-inverse text-inverse shadow-xl border border-inverse motion-safe:animate-toast-in"
+        >
+            <Hand size={18} className="text-warning-strong flex-shrink-0" aria-hidden />
+            <p className="flex-1 min-w-0 text-body">
+                Movendo <span className="font-bold">{name}</span>
+                <span className="block text-caption text-inverse-muted">Toque no grupo de destino</span>
+            </p>
+            <button type="button" onClick={onCancel}
+                className="h-10 px-3 rounded-control text-body font-semibold text-inverse hover:bg-black/5 flex-shrink-0 focus-visible:outline-[var(--background-color-canvas)]">
+                Cancelar
+            </button>
         </div>
     )
 }
