@@ -211,7 +211,7 @@ export default function Profile() {
                             : { backgroundColor: 'var(--color-gold)', color: 'white', border: 'none' }
                         }
                     >
-                        {loadingPush ? 'Aguarde...' : isSubscribed ? '🔔 Notificações ativadas — clique para desativar' : '🔕 Ativar notificações'}
+                        {loadingPush ? 'Aguarde...' : isSubscribed ? '🔔 Notificações ativadas - clique para desativar' : '🔕 Ativar notificações'}
                     </button>
                 </div>
 

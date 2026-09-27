@@ -69,7 +69,7 @@ export default function JoinTournament() {
             })
 
         if (error) {
-            showToast('Erro ao entrar no campeonato.')
+            showToast('Erro ao entrar no campeonato.', 'error')
             setJoining(false)
             return
         }

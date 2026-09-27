@@ -115,7 +115,7 @@ export default function CreateTournament() {
                     ))}
                 </div>
 
-                {/* Step 1 — Modo */}
+                {/* Step 1 - Modo */}
                 {step === 1 && (
                     <div className="flex flex-col gap-4">
                         <h2 className="text-white font-bold text-lg">Qual o modo?</h2>
@@ -133,7 +133,7 @@ export default function CreateTournament() {
                             </div>
                             <div className="text-left">
                                 <p className="text-white font-bold">1v1</p>
-                                <p className="text-white/40 text-sm">Individual — cada jogador por si</p>
+                                <p className="text-white/40 text-sm">Individual - cada jogador por si</p>
                             </div>
                         </button>
 
@@ -150,13 +150,13 @@ export default function CreateTournament() {
                             </div>
                             <div className="text-left">
                                 <p className="text-white font-bold">2v2</p>
-                                <p className="text-white/40 text-sm">Duplas — dois jogadores por time</p>
+                                <p className="text-white/40 text-sm">Duplas - dois jogadores por time</p>
                             </div>
                         </button>
                     </div>
                 )}
 
-                {/* Step 2 — Formato */}
+                {/* Step 2 - Formato */}
                 {step === 2 && (
                     <div className="flex flex-col gap-4">
                         <h2 className="text-white font-bold text-lg">Qual o formato?</h2>
@@ -183,7 +183,7 @@ export default function CreateTournament() {
                     </div>
                 )}
 
-                {/* Step 3 — Detalhes */}
+                {/* Step 3 - Detalhes */}
                 {step === 3 && (
                     <div className="flex flex-col gap-4">
                         <h2 className="text-white font-bold text-lg">Detalhes do campeonato</h2>

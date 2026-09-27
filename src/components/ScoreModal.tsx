@@ -76,7 +76,10 @@ export default function ScoreModal({ match, homeName, awayName, onClose }: Props
         })
         if (pushError) console.error('Erro ao enviar push:', pushError)
 
-        showToast(pushError ? 'Resultado salvo (notificação não enviada).' : 'Resultado salvo e notificações enviadas!')
+        showToast(
+            pushError ? 'Resultado salvo (notificação não enviada).' : 'Resultado salvo e notificações enviadas!',
+            pushError ? 'warning' : 'success',
+        )
         onClose()
     }
 
@@ -123,7 +126,7 @@ export default function ScoreModal({ match, homeName, awayName, onClose }: Props
 
                     {needsPenalties ? (
                         <div className="mb-4">
-                            <p className="text-white/50 text-xs text-center mb-2">Empate — pênaltis</p>
+                            <p className="text-white/50 text-xs text-center mb-2">Empate - pênaltis</p>
                             <div className="flex items-center gap-3">
                                 <input
                                     type="number"

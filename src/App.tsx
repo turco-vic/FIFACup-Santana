@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Navbar from './components/NavBar'
 import BottomNav from './components/BottomNav'
@@ -18,6 +19,9 @@ import TournamentDashboard from './pages/TournamentDashboard'
 import TournamentManage from './pages/TournamentManage'
 import Tournaments from './pages/Tournaments'
 
+// Vitrine do design system (D2): só existe em desenvolvimento, fica fora do build de produção
+const DesignPreview = import.meta.env.DEV ? lazy(() => import('./pages/DesignPreview')) : null
+
 function App() {
   return (
     <BrowserRouter>
@@ -25,6 +29,9 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        {DesignPreview && (
+          <Route path="/design" element={<Suspense fallback={null}><DesignPreview /></Suspense>} />
+        )}
 
         <Route path="/*" element={
           <ProtectedRoute>

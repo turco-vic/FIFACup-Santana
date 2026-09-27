@@ -90,11 +90,11 @@ export default function TournamentManage() {
     async function handleRemovePlayer(playerId: string) {
         if (!id) return
         if (playerId === profile?.id) {
-            showToast('Você não pode remover a si mesmo.')
+            showToast('Você não pode remover a si mesmo.', 'warning')
             return
         }
         if (savedDuos.some(d => d.player1_id === playerId || d.player2_id === playerId)) {
-            showToast('Jogador está em uma dupla. Resete o campeonato antes de removê-lo.')
+            showToast('Jogador está em uma dupla. Resete o campeonato antes de removê-lo.', 'warning')
             return
         }
         const { count } = await supabase
@@ -103,7 +103,7 @@ export default function TournamentManage() {
             .eq('tournament_id', id)
             .or(`home_id.eq.${playerId},away_id.eq.${playerId}`)
         if ((count ?? 0) > 0) {
-            showToast('Jogador já tem partidas. Resete o campeonato antes de removê-lo.')
+            showToast('Jogador já tem partidas. Resete o campeonato antes de removê-lo.', 'warning')
             return
         }
         if (!window.confirm(`Remover ${getPlayerName(playerId)} do campeonato?`)) return
@@ -111,7 +111,7 @@ export default function TournamentManage() {
         const { data, error } = await supabase.from('tournament_players').delete()
             .eq('tournament_id', id).eq('player_id', playerId).select('id')
         if (error || !data || data.length === 0) {
-            showToast('Não foi possível remover o jogador.')
+            showToast('Não foi possível remover o jogador.', 'error')
             return
         }
         setPlayers(prev => prev.filter(p => p.player_id !== playerId))
@@ -126,7 +126,7 @@ export default function TournamentManage() {
         const { data, error } = await supabase.from('tournaments').update({ status }).eq('id', id).select('id')
         setWorking(false)
         if (error || !data || data.length === 0) {
-            showToast('Não foi possível alterar o status.')
+            showToast('Não foi possível alterar o status.', 'error')
             return
         }
         setTournament(prev => prev ? { ...prev, status } : null)
@@ -149,7 +149,7 @@ export default function TournamentManage() {
         }
         setDuos(newDuos)
         if (shuffled.length % 2 === 1) {
-            showToast(`Número ímpar: ${getPlayerName(shuffled[shuffled.length - 1])} ficou sem dupla.`)
+            showToast(`Número ímpar: ${getPlayerName(shuffled[shuffled.length - 1])} ficou sem dupla.`, 'warning')
         }
     }
 
@@ -177,7 +177,7 @@ export default function TournamentManage() {
 
         const valid = duos.filter(d => d.p1 && d.p2)
         if (valid.length === 0) {
-            showToast('Nenhuma dupla válida.')
+            showToast('Nenhuma dupla válida.', 'warning')
             setWorking(false)
             return
         }
@@ -188,7 +188,7 @@ export default function TournamentManage() {
             .select('id', { count: 'exact', head: true })
             .eq('tournament_id', id)
         if ((matchCount ?? 0) > 0) {
-            showToast('Já existem partidas. Resete o campeonato antes de refazer as duplas.')
+            showToast('Já existem partidas. Resete o campeonato antes de refazer as duplas.', 'warning')
             setWorking(false)
             return
         }
@@ -206,7 +206,7 @@ export default function TournamentManage() {
             ).select()).data
         } catch (e) {
             console.error(e)
-            showToast('Erro ao salvar duplas.')
+            showToast('Erro ao salvar duplas.', 'error')
             setWorking(false)
             return
         }
@@ -223,7 +223,7 @@ export default function TournamentManage() {
     function handleDrawGroups() {
         const numGroups = planGroups(players.length)
         if (numGroups === null) {
-            showToast('Grupos + mata-mata aceita de 4 a 40 jogadores.')
+            showToast('Grupos + mata-mata aceita de 4 a 40 jogadores.', 'warning')
             return
         }
         // Distribuição round-robin: tamanhos diferem no máximo em 1, nunca há grupo vazio
@@ -237,7 +237,7 @@ export default function TournamentManage() {
     function handleManualGroups() {
         const numGroups = planGroups(players.length)
         if (numGroups === null) {
-            showToast('Grupos + mata-mata aceita de 4 a 40 jogadores.')
+            showToast('Grupos + mata-mata aceita de 4 a 40 jogadores.', 'warning')
             return
         }
         setDraft(emptyDraft(numGroups, players.map(p => p.player_id)))
@@ -255,22 +255,22 @@ export default function TournamentManage() {
 
         // Validações antes de apagar qualquer coisa
         if (tournament.mode === '2v2' && savedDuos.length < 2) {
-            showToast('Salve pelo menos 2 duplas primeiro.')
+            showToast('Salve pelo menos 2 duplas primeiro.', 'warning')
             return
         }
         if (tournament.mode === '1v1' && playerIds.length < 2) {
-            showToast('Mínimo 2 jogadores.')
+            showToast('Mínimo 2 jogadores.', 'warning')
             return
         }
         if (tournament.format === 'groups_knockout' && planGroups(playerIds.length) === null) {
-            showToast('Grupos + mata-mata aceita de 4 a 40 jogadores.')
+            showToast('Grupos + mata-mata aceita de 4 a 40 jogadores.', 'warning')
             return
         }
         if (tournament.format === 'groups_knockout') {
             // Todos os jogadores atuais em algum grupo, e cada grupo com pelo menos 2
             const problem = draft ? draftProblem(draft, playerIds) : 'Sorteie ou monte os grupos primeiro.'
             if (problem) {
-                showToast(problem)
+                showToast(problem, 'warning')
                 return
             }
         }
@@ -298,7 +298,7 @@ export default function TournamentManage() {
             }
         } catch (e) {
             console.error(e)
-            showToast('Erro ao gerar as partidas. Tente gerar de novo.')
+            showToast('Erro ao gerar as partidas. Tente gerar de novo.', 'error')
             setWorking(false)
             return
         }
@@ -391,7 +391,7 @@ export default function TournamentManage() {
             check(await supabase.from('tournaments').update({ status: 'setup' }).eq('id', id))
         } catch (e) {
             console.error(e)
-            showToast('Erro ao resetar. Parte dos dados pode já ter sido apagada; tente de novo.')
+            showToast('Erro ao resetar. Parte dos dados pode já ter sido apagada; tente de novo.', 'error')
             setShowResetConfirm(false)
             setWorking(false)
             fetchAll(id)
@@ -573,7 +573,7 @@ export default function TournamentManage() {
                     )}
                 </div>
 
-                {/* Duplas — só para 2v2 */}
+                {/* Duplas - só para 2v2 */}
                 {is2v2 && !locked && (
                     <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden mb-6">
                         <div className="px-4 py-3 border-b border-white/10" style={{ backgroundColor: 'rgba(201,153,42,0.08)' }}>
@@ -659,7 +659,7 @@ export default function TournamentManage() {
                                 <div className="rounded-xl border border-white/20 bg-white/5 overflow-hidden">
                                     <div className="px-4 py-2 border-b border-white/10 flex items-center justify-between">
                                         <p className="text-white/60 text-xs font-bold uppercase tracking-wider">
-                                            Selecionar jogador — Dupla {selectingFor.duoIndex + 1}, Slot {selectingFor.slot}
+                                            Selecionar jogador | Dupla {selectingFor.duoIndex + 1}, Slot {selectingFor.slot}
                                         </p>
                                         <button onClick={() => setSelectingFor(null)} className="text-white/40 hover:text-white transition">
                                             <X size={14} />
@@ -736,7 +736,7 @@ export default function TournamentManage() {
                         {isGroupsKO && draft && (
                             <div>
                                 <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--color-gold)' }}>
-                                    Prévia — ainda não gravado
+                                    Prévia - ainda não gravado
                                 </p>
                                 <p className="text-white/40 text-xs mb-2">
                                     {movingPid

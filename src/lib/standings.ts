@@ -16,7 +16,7 @@ export function tiedOnAllCriteria(a: Standing, b: Standing): boolean {
     return compareStandings(a, b) === 0
 }
 
-// Classificação ordenada. Vitória 3, empate 1 — pelo placar do tempo normal:
+// Classificação ordenada. Vitória 3, empate 1 - pelo placar do tempo normal:
 // pênaltis decidem quem avança no mata-mata, mas o jogo conta como empate.
 // Cada lado é contado de forma independente, então dá para calcular um único jogador
 // sobre partidas contra adversários que não estão na lista.

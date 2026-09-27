@@ -182,11 +182,11 @@ export default function TournamentDashboard() {
         const plan = planBracket(bracketSource.firstStage, bracketSource.pairs, matches, createStage)
         if (plan.undecided.length > 0) {
             const m = plan.undecided[0]
-            showToast(`${getEntityName(m.home_id)} × ${getEntityName(m.away_id)} está sem vencedor. Edite o resultado e informe os pênaltis.`)
+            showToast(`${getEntityName(m.home_id)} × ${getEntityName(m.away_id)} está sem vencedor. Edite o resultado e informe os pênaltis.`, 'warning')
             return
         }
         if (planIsEmpty(plan)) {
-            showToast(createStage ? 'Nada a gerar ainda.' : 'Os confrontos já batem com os resultados. Nada a recalcular.')
+            showToast(createStage ? 'Nada a gerar ainda.' : 'Os confrontos já batem com os resultados. Nada a recalcular.', 'info')
             return
         }
         if (plan.remove.length === 0) applyPlan(plan)
@@ -209,7 +209,7 @@ export default function TournamentDashboard() {
         } catch (e) {
             console.error(e)
             // O plano é recalculado do zero a cada vez: repetir completa o que faltou
-            showToast('Erro ao atualizar o chaveamento. Tente de novo.')
+            showToast('Erro ao atualizar o chaveamento. Tente de novo.', 'error')
         } finally {
             setGeneratingBracket(false)
             fetchAll(id, { silent: true })
@@ -452,7 +452,7 @@ export default function TournamentDashboard() {
                                                 ? <ChampionCard name={getEntityName(championId)} onCelebrate={() => setShowConfetti(true)} />
                                                 : leagueTiedAtTop && (
                                                     <p className="px-4 py-3 rounded-xl text-center text-sm text-yellow-400 bg-yellow-400/10 border border-yellow-400/20">
-                                                        Empate na liderança em pontos, saldo e gols pró — sem campeão definido.
+                                                        Empate na liderança em pontos, saldo e gols pró - sem campeão definido.
                                                     </p>
                                                 )
                                         )}
@@ -460,7 +460,7 @@ export default function TournamentDashboard() {
                                     </div>
                                 )}
 
-                                {/* Grupos — tabela por grupo + partidas */}
+                                {/* Grupos - tabela por grupo + partidas */}
                                 {groupMatches.length > 0 && (
                                     <div className="flex flex-col gap-6">
                                         {groups.length > 0 ? groups.map(group => {
@@ -497,7 +497,7 @@ export default function TournamentDashboard() {
                                     </div>
                                 )}
 
-                                {/* Bracket visual — formato grupos + mata-mata */}
+                                {/* Bracket visual - formato grupos + mata-mata */}
                                 {tournament.format === 'groups_knockout' && (
                                     <div className="flex flex-col gap-4">
                                         {bracketActions}

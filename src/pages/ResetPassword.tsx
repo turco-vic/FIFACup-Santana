@@ -36,7 +36,7 @@ export default function ResetPassword() {
         }
       })
 
-      // Timeout — se após 5s não tiver sessão, mostra erro
+      // Timeout - se após 5s não tiver sessão, mostra erro
       setTimeout(() => {
         setChecking(false)
       }, 5000)

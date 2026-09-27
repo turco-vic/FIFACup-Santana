@@ -46,7 +46,7 @@ export default function Supreme() {
             .update({ status: 'active' })
             .eq('id', p.id)
 
-        if (error) { showToast('Erro ao aprovar.'); return }
+        if (error) { showToast('Erro ao aprovar.', 'error'); return }
         setAllProfiles(prev => prev.map(u => u.id === p.id ? { ...u, status: 'active' } : u))
         showToast(`${p.name ?? p.username ?? 'Usuário'} aprovado!`)
     }
@@ -58,7 +58,7 @@ export default function Supreme() {
             .update({ status: newStatus })
             .eq('id', p.id)
 
-        if (error) { showToast('Erro ao atualizar.'); return }
+        if (error) { showToast('Erro ao atualizar.', 'error'); return }
         setAllProfiles(prev => prev.map(u => u.id === p.id ? { ...u, status: newStatus } : u))
         showToast(newStatus === 'blocked' ? 'Usuário bloqueado.' : 'Usuário desbloqueado.')
     }
