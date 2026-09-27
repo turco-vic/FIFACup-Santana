@@ -1,22 +1,25 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { formatDate } from '../lib/format'
 import { FORMAT_LABEL, STATUS_LABEL } from '../lib/labels'
 import { useAuth } from '../hooks/useAuth'
 import type { Tournament } from '../types'
 import { Skeleton, SkeletonCard } from '../components/Skeleton'
-import { Trophy, Swords, Handshake, Calendar, Plus, Hash } from 'lucide-react'
+import { Trophy, Swords, Handshake, Calendar, Plus, Hash, ChevronRight } from 'lucide-react'
+import Badge from '../components/ui/Badge'
+import { Card, CardBody } from '../components/ui/Card'
+import { buttonClasses, type BadgeTone } from '../components/ui/variants'
+import { cx } from '../lib/cx'
 
-const STATUS_COLOR: Record<string, string> = {
-    setup: 'text-white/40',
-    active: 'text-green-400',
-    finished: 'text-white/30',
+const STATUS_TONE: Record<string, BadgeTone> = {
+    setup: 'neutral',
+    active: 'success',
+    finished: 'neutral',
 }
 
 export default function Tournaments() {
     const { profile, isSupreme } = useAuth()
-    const navigate = useNavigate()
     const [tournaments, setTournaments] = useState<Tournament[]>([])
     const [loading, setLoading] = useState(true)
 
@@ -57,9 +60,9 @@ export default function Tournaments() {
 
     if (loading) {
         return (
-            <div className="min-h-screen p-6">
+            <div className="px-4 pt-4 pb-6 sm:px-6">
                 <div className="max-w-2xl mx-auto">
-                    <Skeleton className="h-8 w-48 mb-6" />
+                    <Skeleton className="h-9 w-56 mb-6" />
                     <div className="flex flex-col gap-3">
                         {[...Array(4)].map((_, i) => <SkeletonCard key={i} />)}
                     </div>
@@ -72,75 +75,60 @@ export default function Tournaments() {
     const others = tournaments.filter(t => t.status !== 'active')
 
     return (
-        <div className="min-h-screen p-6">
-            <div className="max-w-2xl mx-auto">
+        <div className="px-4 pt-4 pb-6 sm:px-6">
+            <div className="max-w-2xl mx-auto flex flex-col gap-6">
 
-                <div className="flex items-center justify-between mb-6">
-                    <h1 className="text-2xl font-bold" style={{ color: 'var(--color-gold)' }}>
+                <header className="flex items-center justify-between gap-3">
+                    <h1 className="font-display font-bold text-headline uppercase tracking-wide text-brand-text">
                         {isSupreme ? 'Todos os campeonatos' : 'Meus campeonatos'}
                     </h1>
                     {!isSupreme && (
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => navigate('/tournaments/join')}
-                                className="p-2 rounded-lg border border-white/20 text-white/40 hover:text-white hover:border-white/40 transition"
+                        <div className="flex gap-2 flex-shrink-0">
+                            <Link
+                                to="/tournaments/join"
+                                aria-label="Entrar com código"
                                 title="Entrar com código"
+                                className={buttonClasses({ variant: 'secondary', size: 'icon' })}
                             >
                                 <Hash size={18} />
-                            </button>
-                            <button
-                                onClick={() => navigate('/tournaments/new')}
-                                className="p-2 rounded-lg border border-white/20 text-white/40 hover:text-white hover:border-white/40 transition"
+                            </Link>
+                            <Link
+                                to="/tournaments/new"
+                                aria-label="Criar campeonato"
                                 title="Criar campeonato"
+                                className={buttonClasses({ size: 'icon' })}
                             >
-                                <Plus size={18} />
-                            </button>
+                                <Plus size={20} />
+                            </Link>
                         </div>
                     )}
-                </div>
+                </header>
 
                 {tournaments.length === 0 ? (
-                    <div className="text-center py-16">
-                        <Trophy size={48} className="mx-auto mb-4 text-white/10" />
-                        <p className="text-white/30 text-sm">Você não está em nenhum campeonato.</p>
-                        <p className="text-white/20 text-xs mt-1">Crie um ou entre com um código de convite.</p>
-                        <div className="flex gap-3 justify-center mt-6">
-                            <button
-                                onClick={() => navigate('/tournaments/new')}
-                                className="px-5 py-2.5 rounded-xl font-bold text-sm transition hover:opacity-90"
-                                style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
-                            >
-                                Criar campeonato
-                            </button>
-                            <button
-                                onClick={() => navigate('/tournaments/join')}
-                                className="px-5 py-2.5 rounded-xl font-bold text-sm transition border border-white/20 text-white hover:bg-white/10"
-                            >
-                                Entrar com código
-                            </button>
-                        </div>
-                    </div>
+                    <Card>
+                        <CardBody className="flex flex-col items-center text-center gap-2 py-10">
+                            <Trophy size={40} className="text-faint mb-2" aria-hidden />
+                            <p className="text-body-lg text-secondary">Você não está em nenhum campeonato.</p>
+                            <p className="text-body text-muted">Crie um ou entre com um código de convite.</p>
+                            <div className="flex flex-wrap gap-3 justify-center mt-4">
+                                <Link to="/tournaments/new" className={buttonClasses()}>Criar campeonato</Link>
+                                <Link to="/tournaments/join" className={buttonClasses({ variant: 'secondary' })}>Entrar com código</Link>
+                            </div>
+                        </CardBody>
+                    </Card>
                 ) : (
                     <>
                         {active.length > 0 && (
-                            <div className="mb-6">
-                                <h3 className="text-white/40 text-xs uppercase tracking-wider mb-3">Em andamento</h3>
-                                <div className="flex flex-col gap-3">
-                                    {active.map(t => (
-                                        <TournamentCard key={t.id} tournament={t} onClick={() => navigate(`/tournament/${t.id}`)} />
-                                    ))}
-                                </div>
-                            </div>
+                            <section className="flex flex-col gap-3">
+                                <h2 className="text-label uppercase text-muted">Em andamento · {active.length}</h2>
+                                {active.map(t => <TournamentCard key={t.id} tournament={t} />)}
+                            </section>
                         )}
                         {others.length > 0 && (
-                            <div className="mb-6">
-                                <h3 className="text-white/40 text-xs uppercase tracking-wider mb-3">Outros</h3>
-                                <div className="flex flex-col gap-3">
-                                    {others.map(t => (
-                                        <TournamentCard key={t.id} tournament={t} onClick={() => navigate(`/tournament/${t.id}`)} />
-                                    ))}
-                                </div>
-                            </div>
+                            <section className="flex flex-col gap-3">
+                                <h2 className="text-label uppercase text-muted">Outros · {others.length}</h2>
+                                {others.map(t => <TournamentCard key={t.id} tournament={t} />)}
+                            </section>
                         )}
                     </>
                 )}
@@ -150,35 +138,40 @@ export default function Tournaments() {
     )
 }
 
-function TournamentCard({ tournament: t, onClick }: { tournament: Tournament; onClick: () => void }) {
-
+export function TournamentCard({ tournament: t }: { tournament: Tournament }) {
+    const active = t.status === 'active'
     return (
-        <button
-            onClick={onClick}
-            className="flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition text-left w-full"
+        <Link
+            to={`/tournament/${t.id}`}
+            className={cx(
+                'group flex items-center gap-3 p-4 rounded-card border transition-colors',
+                active ? 'bg-surface border-accent hover:bg-surface-hover' : 'bg-surface border-subtle hover:bg-surface-hover',
+            )}
         >
-            <div className="p-2.5 rounded-lg flex-shrink-0" style={{ backgroundColor: 'rgba(201,153,42,0.15)' }}>
-                {t.mode === '1v1'
-                    ? <Swords size={20} style={{ color: 'var(--color-gold)' }} />
-                    : <Handshake size={20} style={{ color: 'var(--color-gold)' }} />
-                }
+            <div className="w-11 h-11 rounded-control bg-brand-muted text-brand-text flex items-center justify-center flex-shrink-0">
+                {t.mode === '1v1' ? <Swords size={22} aria-hidden /> : <Handshake size={22} aria-hidden />}
             </div>
             <div className="flex-1 min-w-0">
-                <p className="text-white font-bold text-sm truncate">{t.name}</p>
-                <p className="text-white/40 text-xs truncate">
+                <p className="font-display font-bold text-title uppercase tracking-wide text-primary truncate leading-tight">
+                    {t.name}
+                </p>
+                <p className="text-caption text-muted truncate mt-0.5">
                     {t.mode} · {FORMAT_LABEL[t.format] ?? t.format}
                 </p>
-                {t.date && (
-                    <p className="text-white/30 text-xs flex items-center gap-1 mt-0.5">
-                        <Calendar size={10} />
-                        {formatDate(t.date)}
-                    </p>
-                )}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
+                    <Badge tone={STATUS_TONE[t.status] ?? 'neutral'} dot={active}>
+                        {STATUS_LABEL[t.status] ?? t.status}
+                    </Badge>
+                    {t.date && (
+                        <span className="text-caption text-muted flex items-center gap-1">
+                            <Calendar size={12} aria-hidden />
+                            {formatDate(t.date)}
+                        </span>
+                    )}
+                    <span className="text-caption text-faint font-mono tracking-wider">{t.invite_code}</span>
+                </div>
             </div>
-            <div className="flex-shrink-0 text-right">
-                <span className={`text-xs font-medium ${STATUS_COLOR[t.status] ?? 'text-white/40'}`}>{STATUS_LABEL[t.status] ?? t.status}</span>
-                <p className="text-white/20 text-xs mt-0.5 font-mono">{t.invite_code}</p>
-            </div>
-        </button>
+            <ChevronRight size={20} className="text-muted flex-shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden />
+        </Link>
     )
 }

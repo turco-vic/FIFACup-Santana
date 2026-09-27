@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { supabase, check } from '../lib/supabase'
 import { getWinner, penaltiesLabel } from '../lib/matches'
@@ -8,16 +8,25 @@ import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../hooks/useToast'
 import { computeStandings, profileEntity, tiedOnAllCriteria, type Entity } from '../lib/standings'
 import { FORMAT_LABEL, STATUS_LABEL } from '../lib/labels'
+import { cx } from '../lib/cx'
 import GroupTable from '../components/GroupTable'
 import type { Tournament, Profile, Match, MatchStage, TournamentPlayer } from '../types'
 import {
     ArrowLeft, MapPin, Calendar, Copy, Check,
-    Trophy, Settings, Swords, Handshake, Pencil, Plus, Clock, X, Save, RefreshCw, AlertTriangle, ChevronRight
+    Trophy, Settings, Swords, Handshake, Pencil, Plus, Clock, Save, RefreshCw, ChevronRight
 } from 'lucide-react'
 import { Skeleton } from '../components/Skeleton'
 import ScoreModal from '../components/ScoreModal'
 import Confetti from '../components/Confetti'
 import KnockoutBracket from '../components/KnockoutBracket'
+import Button from '../components/ui/Button'
+import Badge from '../components/ui/Badge'
+import Modal from '../components/ui/Modal'
+import Input from '../components/ui/Input'
+import Alert from '../components/ui/Alert'
+import Avatar from '../components/ui/Avatar'
+import { Card, CardBody, CardHeader } from '../components/ui/Card'
+import { buttonClasses, type BadgeTone } from '../components/ui/variants'
 
 const STAGE_LABEL: Record<string, string> = {
     groups: 'Grupos', round32: '16avos', round16: 'Oitavas',
@@ -35,10 +44,16 @@ const STAGE_TITLE: Record<string, string> = {
     quarters: 'Quartas de Final', semis: 'Semifinais', final: 'Final',
 }
 
-const STATUS_STYLE: Record<string, { color: string; bg: string }> = {
-    setup: { color: 'text-white/50', bg: 'bg-white/10' },
-    active: { color: 'text-green-400', bg: 'bg-green-500/15' },
-    finished: { color: 'text-white/30', bg: 'bg-white/5' },
+const STATUS_TONE: Record<string, BadgeTone> = {
+    setup: 'neutral',
+    active: 'success',
+    finished: 'neutral',
+}
+
+const TAB_LABEL: Record<string, string> = {
+    partidas: 'Partidas',
+    jogadores: 'Jogadores',
+    estatisticas: 'Stats',
 }
 
 type Tab = 'partidas' | 'jogadores' | 'estatisticas'
@@ -274,27 +289,28 @@ export default function TournamentDashboard() {
     const bracketActions = canEdit && bracketSource && (
         <div className="flex flex-col gap-2">
             {nextStage && (
-                <button
+                <Button
+                    fullWidth
+                    size="lg"
+                    icon={<Trophy size={18} />}
                     onClick={() => requestPlan(nextStage)}
                     disabled={generatingBracket}
-                    className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-40"
-                    style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}
                 >
-                    <Trophy size={16} />
                     {generatingBracket ? 'Gerando...' : `Gerar ${STAGE_TITLE[nextStage]}`}
-                </button>
+                </Button>
             )}
             {koMatches.length > 0 && (
                 <>
-                    <button
+                    <Button
+                        variant="secondary"
+                        fullWidth
+                        icon={<RefreshCw size={16} className={generatingBracket ? 'animate-spin' : ''} />}
                         onClick={() => requestPlan()}
                         disabled={generatingBracket}
-                        className="w-full py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 border border-white/20 text-white/60 hover:text-white hover:border-white/40 transition disabled:opacity-40"
                     >
-                        <RefreshCw size={14} className={generatingBracket ? 'animate-spin' : ''} />
                         Recalcular confrontos
-                    </button>
-                    <p className="text-white/30 text-xs text-center">
+                    </Button>
+                    <p className="text-caption text-muted text-center">
                         Corrigiu um placar depois de gerar a fase seguinte? Recalcule para atualizar os confrontos.
                     </p>
                 </>
@@ -312,12 +328,18 @@ export default function TournamentDashboard() {
 
     if (authLoading || loading) {
         return (
-            <div className="min-h-screen p-6">
-                <div className="max-w-2xl mx-auto flex flex-col gap-4">
-                    <Skeleton className="h-6 w-32" />
-                    <Skeleton className="h-24 w-full rounded-xl" />
-                    <div className="flex gap-2"><Skeleton className="h-9 w-28" /><Skeleton className="h-9 w-28" /></div>
-                    <Skeleton className="h-40 w-full rounded-xl" />
+            <div className="px-4 pt-4 pb-6 sm:px-6">
+                <div className="max-w-2xl mx-auto flex flex-col gap-5">
+                    <div className="flex items-center gap-3">
+                        <Skeleton className="h-11 w-11 rounded-card" />
+                        <div className="flex-1 flex flex-col gap-2">
+                            <Skeleton className="h-7 w-2/3" />
+                            <Skeleton className="h-5 w-1/2" />
+                        </div>
+                    </div>
+                    <Skeleton className="h-28 w-full rounded-card" />
+                    <Skeleton className="h-12 w-full rounded-card" />
+                    <Skeleton className="h-64 w-full rounded-card" />
                 </div>
             </div>
         )
@@ -327,177 +349,202 @@ export default function TournamentDashboard() {
 
     if (notMember) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center px-6 gap-4">
-                <Trophy size={48} className="text-white/10" />
-                <p className="text-white/50 text-center">Você não faz parte desse campeonato.</p>
-                <button onClick={() => navigate('/tournaments/join')}
-                    className="px-6 py-3 rounded-xl font-bold transition hover:opacity-90"
-                    style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}>
-                    Entrar com código
-                </button>
+            <div className="px-4 pt-10 pb-6 sm:px-6">
+                <Card className="max-w-sm mx-auto">
+                    <CardBody className="flex flex-col items-center text-center gap-4 py-10">
+                        <Trophy size={40} className="text-faint" aria-hidden />
+                        <p className="text-body-lg text-secondary">Você não faz parte desse campeonato.</p>
+                        <Link to="/tournaments/join" className={buttonClasses({ size: 'lg' })}>
+                            Entrar com código
+                        </Link>
+                    </CardBody>
+                </Card>
             </div>
         )
     }
 
-    const statusStyle = STATUS_STYLE[tournament.status]
-
     return (
-        <div className="min-h-screen p-6">
+        <div className="px-4 pt-4 pb-6 sm:px-6">
             <Confetti active={showConfetti} duration={5000} />
-            <div className="max-w-2xl mx-auto">
+            <div className="max-w-2xl mx-auto flex flex-col gap-5">
 
-                {/* Header */}
-                <div className="flex items-center gap-3 mb-6">
-                    <button onClick={() => navigate('/tournaments')} className="p-2 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition flex-shrink-0">
-                        <ArrowLeft size={20} />
-                    </button>
-                    <div className="flex-1 min-w-0">
-                        <h1 className="text-xl font-bold text-white truncate">{tournament.name}</h1>
-                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                            <span className="text-xs px-2 py-0.5 rounded font-bold"
-                                style={{ backgroundColor: 'rgba(201,153,42,0.2)', color: 'var(--color-gold)' }}>
-                                {tournament.mode}
-                            </span>
-                            <span className="text-white/30 text-xs">{FORMAT_LABEL[tournament.format]}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded font-bold ${statusStyle.color} ${statusStyle.bg}`}>
+                {/* Cabeçalho */}
+                <header className="flex items-start gap-2">
+                    <Link
+                        to="/tournaments"
+                        aria-label="Voltar para campeonatos"
+                        className={buttonClasses({ variant: 'ghost', size: 'icon', className: '-ml-2 flex-shrink-0' })}
+                    >
+                        <ArrowLeft size={22} />
+                    </Link>
+                    <div className="flex-1 min-w-0 pt-1">
+                        <h1 className="font-display font-bold text-headline uppercase tracking-wide leading-tight line-clamp-2 break-words">
+                            {tournament.name}
+                        </h1>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                            <Badge tone="brand">{tournament.mode}</Badge>
+                            <Badge>{FORMAT_LABEL[tournament.format]}</Badge>
+                            <Badge tone={STATUS_TONE[tournament.status]} dot={tournament.status === 'active'}>
                                 {STATUS_LABEL[tournament.status]}
-                            </span>
+                            </Badge>
                         </div>
                     </div>
                     {isAdmin && (
-                        <button onClick={() => navigate(`/tournament/${tournament.id}/manage`)}
-                            className="p-2 rounded-lg border border-white/20 text-white/40 hover:text-white hover:border-white/40 transition flex-shrink-0">
-                            <Settings size={18} />
-                        </button>
+                        <Link
+                            to={`/tournament/${tournament.id}/manage`}
+                            aria-label="Gerenciar campeonato"
+                            className={buttonClasses({ variant: 'secondary', size: 'icon', className: 'flex-shrink-0' })}
+                        >
+                            <Settings size={20} />
+                        </Link>
                     )}
-                </div>
+                </header>
 
-                {/* Info */}
-                <div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3 mb-6 flex flex-col gap-2">
-                    {tournament.location && <div className="flex items-center gap-2 text-white/50 text-sm"><MapPin size={13} /><span>{tournament.location}</span></div>}
-                    {tournament.date && <div className="flex items-center gap-2 text-white/50 text-sm"><Calendar size={13} /><span>{formatDate(tournament.date)}</span></div>}
-                    {tournament.description && <p className="text-white/40 text-xs mt-1">{tournament.description}</p>}
-                    <div className="flex items-center justify-between mt-1 pt-2 border-t border-white/10">
-                        <div>
-                            <p className="text-white/30 text-xs">Código de convite</p>
-                            <p className="text-white font-mono font-bold tracking-widest">{tournament.invite_code}</p>
+                {/* Informações e código de convite */}
+                <Card>
+                    <CardBody className="flex flex-col gap-3">
+                        {(tournament.location || tournament.date) && (
+                            <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-body text-secondary">
+                                {tournament.location && (
+                                    <span className="flex items-center gap-1.5"><MapPin size={15} className="text-muted" aria-hidden />{tournament.location}</span>
+                                )}
+                                {tournament.date && (
+                                    <span className="flex items-center gap-1.5"><Calendar size={15} className="text-muted" aria-hidden />{formatDate(tournament.date)}</span>
+                                )}
+                            </div>
+                        )}
+                        {tournament.description && <p className="text-body text-muted">{tournament.description}</p>}
+                        <div className={cx(
+                            'flex items-center justify-between gap-3',
+                            (tournament.location || tournament.date || tournament.description) && 'pt-3 border-t border-subtle',
+                        )}>
+                            <div className="min-w-0">
+                                <p className="text-label uppercase text-muted">Código de convite</p>
+                                <p className="font-display font-bold text-headline tracking-[0.2em] tabular-nums text-primary">
+                                    {tournament.invite_code}
+                                </p>
+                            </div>
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={copyCode}
+                                icon={copied ? <Check size={15} className="text-success" /> : <Copy size={15} />}
+                            >
+                                {copied ? 'Copiado!' : 'Copiar'}
+                            </Button>
                         </div>
-                        <button onClick={copyCode}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/20 text-white/50 hover:text-white hover:border-white/40 transition text-xs font-medium">
-                            {copied ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
-                            {copied ? 'Copiado!' : 'Copiar'}
-                        </button>
-                    </div>
-                </div>
+                    </CardBody>
+                </Card>
 
-                {/* Tabs */}
-                <div className="flex gap-2 mb-6">
+                {/* Abas */}
+                <div role="tablist" aria-label="Seções do campeonato" className="grid grid-cols-3 gap-1 p-1 rounded-card bg-fill border border-subtle">
                     {(['partidas', 'jogadores', 'estatisticas'] as Tab[]).map(t => (
-                        <button key={t} onClick={() => setTab(t)}
-                            className="px-4 py-2 rounded-lg font-bold text-sm transition"
-                            style={tab === t
-                                ? { backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }
-                                : { backgroundColor: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }
-                            }>
-                            {t === 'partidas' ? 'Partidas' : t === 'jogadores' ? `Jogadores (${players.length})` : 'Stats'}
+                        <button
+                            key={t}
+                            type="button"
+                            role="tab"
+                            aria-selected={tab === t}
+                            onClick={() => setTab(t)}
+                            className={cx(
+                                'h-10 rounded-control text-body font-semibold transition-colors',
+                                tab === t ? 'bg-brand text-on-brand shadow-sm' : 'text-secondary hover:text-primary hover:bg-fill-strong',
+                            )}
+                        >
+                            {t === 'jogadores' ? `${TAB_LABEL[t]} (${players.length})` : TAB_LABEL[t]}
                         </button>
                     ))}
                 </div>
 
-                {/* Tab: Partidas */}
+                {/* Aba: Partidas */}
                 {tab === 'partidas' && (
-                    <div className="flex flex-col gap-6">
+                    <div className="flex flex-col gap-5">
                         {matches.length === 0 ? (
-                            <div className="text-center py-12">
-                                {tournament.mode === '1v1' ? <Swords size={40} className="mx-auto mb-3 text-white/10" /> : <Handshake size={40} className="mx-auto mb-3 text-white/10" />}
-                                <p className="text-white/30 text-sm">Nenhuma partida ainda.</p>
-                                {isAdmin && (
-                                    <button onClick={() => navigate(`/tournament/${tournament.id}/manage`)}
-                                        className="mt-4 px-5 py-2.5 rounded-xl font-bold text-sm transition hover:opacity-90"
-                                        style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}>
-                                        Gerenciar campeonato
-                                    </button>
-                                )}
-                            </div>
+                            <Card>
+                                <CardBody className="flex flex-col items-center text-center gap-3 py-10">
+                                    {tournament.mode === '1v1'
+                                        ? <Swords size={36} className="text-faint" aria-hidden />
+                                        : <Handshake size={36} className="text-faint" aria-hidden />}
+                                    <p className="text-body text-muted">Nenhuma partida ainda.</p>
+                                    {isAdmin && (
+                                        <Link to={`/tournament/${tournament.id}/manage`} className={buttonClasses({ className: 'mt-1' })}>
+                                            Gerenciar campeonato
+                                        </Link>
+                                    )}
+                                </CardBody>
+                            </Card>
                         ) : (
                             <>
                                 {/* Liga */}
                                 {leagueMatches.length > 0 && (
                                     <div className="flex flex-col gap-4">
-                                        <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
-                                            <div className="px-4 py-3 border-b border-white/10" style={{ backgroundColor: 'rgba(201,153,42,0.08)' }}>
-                                                <h3 className="font-bold text-sm" style={{ color: 'var(--color-gold)' }}>Classificação</h3>
-                                            </div>
-                                            <div className="px-2 py-2">
-                                                <GroupTable standings={leagueStandings} qualifiers={0}
-                                                    onClickRow={tournament.mode === '2v2' ? (rowId) => {
-                                                        const duo = duos.find(d => d.id === rowId)
-                                                        if (duo) setSelectedDuo(duo)
-                                                    } : undefined}
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
-                                            <div className="px-4 py-3 border-b border-white/10" style={{ backgroundColor: 'rgba(201,153,42,0.08)' }}>
-                                                <h3 className="font-bold text-sm" style={{ color: 'var(--color-gold)' }}>Partidas</h3>
-                                            </div>
-                                            <div className="px-4 py-3 flex flex-col">
+                                        <Card>
+                                            <CardHeader title="Classificação" />
+                                            <GroupTable standings={leagueStandings} qualifiers={0}
+                                                onClickRow={tournament.mode === '2v2' ? (rowId) => {
+                                                    const duo = duos.find(d => d.id === rowId)
+                                                    if (duo) setSelectedDuo(duo)
+                                                } : undefined}
+                                            />
+                                        </Card>
+                                        <Card>
+                                            <CardHeader
+                                                title="Partidas"
+                                                subtitle={`${leagueMatches.filter(m => m.played).length} de ${leagueMatches.length} jogadas`}
+                                            />
+                                            <div>
                                                 {leagueMatches.map(match => (
                                                     <MatchRow key={match.id} match={match} getEntityName={getEntityName} isAdmin={canEdit} onEdit={() => setSelectedMatch(match)} />
                                                 ))}
                                             </div>
-                                        </div>
+                                        </Card>
                                         {tournament.format === 'league' && allLeaguePlayed && (
                                             championId
                                                 ? <ChampionCard name={getEntityName(championId)} onCelebrate={() => setShowConfetti(true)} />
                                                 : leagueTiedAtTop && (
-                                                    <p className="px-4 py-3 rounded-xl text-center text-sm text-yellow-400 bg-yellow-400/10 border border-yellow-400/20">
+                                                    <Alert tone="warning">
                                                         Empate na liderança em pontos, saldo e gols pró - sem campeão definido.
-                                                    </p>
+                                                    </Alert>
                                                 )
                                         )}
                                         {tournament.format === 'league_final' && bracketActions}
                                     </div>
                                 )}
 
-                                {/* Grupos - tabela por grupo + partidas */}
+                                {/* Grupos: tabela por grupo + partidas */}
                                 {groupMatches.length > 0 && (
-                                    <div className="flex flex-col gap-6">
+                                    <div className="flex flex-col gap-5">
                                         {groups.length > 0 ? groups.map(group => {
                                             const gMatches = groupMatchesOf(group)
                                             const gStandings = computeStandings(group.players.map(profileEntity), gMatches)
                                             return (
-                                                <div key={group.id} className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
-                                                    <div className="px-4 py-3 border-b border-white/10" style={{ backgroundColor: 'rgba(201,153,42,0.08)' }}>
-                                                        <h3 className="font-bold text-sm" style={{ color: 'var(--color-gold)' }}>{group.name}</h3>
-                                                    </div>
-                                                    <div className="px-2 py-2 border-b border-white/5">
-                                                        <GroupTable standings={gStandings} qualifiers={2} />
-                                                    </div>
-                                                    <div className="px-4 py-3 flex flex-col">
+                                                <Card key={group.id}>
+                                                    <CardHeader
+                                                        title={group.name}
+                                                        subtitle={`${gMatches.filter(m => m.played).length} de ${gMatches.length} jogos`}
+                                                    />
+                                                    <GroupTable standings={gStandings} qualifiers={2} />
+                                                    <div className="border-t border-subtle">
                                                         {gMatches.map(match => (
                                                             <MatchRow key={match.id} match={match} getEntityName={getEntityName} isAdmin={canEdit} onEdit={() => setSelectedMatch(match)} />
                                                         ))}
                                                     </div>
-                                                </div>
+                                                </Card>
                                             )
                                         }) : (
                                             // Fallback: sem grupos definidos, mostra todas as partidas
-                                            <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
-                                                <div className="px-4 py-3 border-b border-white/10" style={{ backgroundColor: 'rgba(201,153,42,0.08)' }}>
-                                                    <h3 className="font-bold text-sm" style={{ color: 'var(--color-gold)' }}>Fase de Grupos</h3>
-                                                </div>
-                                                <div className="px-4 py-3 flex flex-col">
+                                            <Card>
+                                                <CardHeader title="Fase de Grupos" />
+                                                <div>
                                                     {groupMatches.map(match => (
                                                         <MatchRow key={match.id} match={match} getEntityName={getEntityName} isAdmin={canEdit} onEdit={() => setSelectedMatch(match)} />
                                                     ))}
                                                 </div>
-                                            </div>
+                                            </Card>
                                         )}
                                     </div>
                                 )}
 
-                                {/* Bracket visual - formato grupos + mata-mata */}
+                                {/* Chaveamento: formato grupos + mata-mata */}
                                 {tournament.format === 'groups_knockout' && (
                                     <div className="flex flex-col gap-4">
                                         {bracketActions}
@@ -517,42 +564,34 @@ export default function TournamentDashboard() {
 
                                 {/* Mata-mata (formato knockout direto) */}
                                 {tournament.format !== 'groups_knockout' && knockoutMatches.length > 0 && (
-                                    <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
-                                        <div className="px-4 py-3 border-b border-white/10" style={{ backgroundColor: 'rgba(201,153,42,0.08)' }}>
-                                            <h3 className="font-bold text-sm" style={{ color: 'var(--color-gold)' }}>Mata-mata</h3>
-                                        </div>
-                                        <div className="px-4 py-3 flex flex-col">
+                                    <Card>
+                                        <CardHeader title="Mata-mata" />
+                                        <div>
                                             {knockoutMatches.map(match => (
-                                                <MatchRow key={match.id} match={match} getEntityName={getEntityName} isAdmin={canEdit} onEdit={() => setSelectedMatch(match)} />
+                                                <MatchRow key={match.id} match={match} getEntityName={getEntityName} isAdmin={canEdit} onEdit={() => setSelectedMatch(match)} showStage />
                                             ))}
                                         </div>
-                                    </div>
+                                    </Card>
                                 )}
 
                                 {/* Final */}
                                 {tournament.format !== 'groups_knockout' && finalMatch && (
-                                    <div className="rounded-xl bg-white/5 border overflow-hidden" style={{ borderColor: 'var(--color-gold)' }}>
-                                        <div className="px-4 py-3 border-b flex items-center gap-2"
-                                            style={{ backgroundColor: 'rgba(201,153,42,0.15)', borderColor: 'var(--color-gold)' }}>
-                                            <Trophy size={16} style={{ color: 'var(--color-gold)' }} />
-                                            <h3 className="font-bold" style={{ color: 'var(--color-gold)' }}>Final</h3>
-                                        </div>
-                                        <div className="px-4 py-4">
-                                            <MatchRow match={finalMatch} getEntityName={getEntityName} isAdmin={canEdit} onEdit={() => setSelectedMatch(finalMatch)} />
-                                            {championId && (
-                                                <div className="mt-4">
-                                                    <ChampionCard name={getEntityName(championId)} onCelebrate={() => setShowConfetti(true)} />
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
+                                    <Card tone="accent">
+                                        <CardHeader title="Final" icon={<Trophy size={20} />} />
+                                        <MatchRow match={finalMatch} getEntityName={getEntityName} isAdmin={canEdit} onEdit={() => setSelectedMatch(finalMatch)} />
+                                        {championId && (
+                                            <div className="p-card pt-0">
+                                                <ChampionCard name={getEntityName(championId)} onCelebrate={() => setShowConfetti(true)} />
+                                            </div>
+                                        )}
+                                    </Card>
                                 )}
                             </>
                         )}
                     </div>
                 )}
 
-                {/* Tab: Estatísticas */}
+                {/* Aba: Estatísticas */}
                 {tab === 'estatisticas' && (() => {
                     const allPlayed = matches.filter(m => m.played && m.home_score !== null && m.away_score !== null)
                     // Todas as fases juntas; pênaltis contam como empate
@@ -574,127 +613,105 @@ export default function TournamentDashboard() {
                                     { label: 'Total de gols', value: totalGoals },
                                     { label: 'Gols por jogo', value: gpj },
                                 ].map(({ label, value }) => (
-                                    <div key={label} className="rounded-xl bg-white/5 border border-white/10 px-3 py-3 text-center">
-                                        <p className="font-bold text-lg text-white">{value}</p>
-                                        <p className="text-white/40 text-xs mt-0.5 leading-tight">{label}</p>
-                                    </div>
+                                    <Card key={label}>
+                                        <CardBody className="px-2 py-4 text-center">
+                                            <p className="font-display font-bold text-display tabular-nums leading-none text-primary">{value}</p>
+                                            <p className="text-caption text-muted mt-1.5 leading-tight">{label}</p>
+                                        </CardBody>
+                                    </Card>
                                 ))}
                             </div>
 
                             {/* Artilheiros */}
                             {topScorers.length > 0 && (
-                                <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
-                                    <div className="px-4 py-3 border-b border-white/10" style={{ backgroundColor: 'rgba(201,153,42,0.08)' }}>
-                                        <h3 className="font-bold text-sm" style={{ color: 'var(--color-gold)' }}>Artilheiros</h3>
-                                    </div>
+                                <Card>
+                                    <CardHeader title="Artilheiros" />
                                     {topScorers.slice(0, 5).map((s, i) => (
-                                        <div key={s.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-white/5 last:border-0">
-                                            <span className="text-white/30 text-xs w-5 text-center font-bold">{i + 1}</span>
-                                            <span className="flex-1 text-white text-sm truncate">{s.name}</span>
-                                            <span className="font-bold text-sm" style={{ color: 'var(--color-gold)' }}>{s.goals_for} gols</span>
-                                        </div>
+                                        <RankRow key={s.id} position={i + 1} name={s.name}>
+                                            <span className="font-display font-bold text-title tabular-nums text-brand-text">{s.goals_for}</span>
+                                            <span className="text-caption text-muted ml-1">gols</span>
+                                        </RankRow>
                                     ))}
-                                </div>
+                                </Card>
                             )}
 
                             {/* Aproveitamento */}
                             {topWinRate.length > 0 && (
-                                <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
-                                    <div className="px-4 py-3 border-b border-white/10" style={{ backgroundColor: 'rgba(201,153,42,0.08)' }}>
-                                        <h3 className="font-bold text-sm" style={{ color: 'var(--color-gold)' }}>Aproveitamento</h3>
-                                    </div>
+                                <Card>
+                                    <CardHeader title="Aproveitamento" />
                                     {topWinRate.slice(0, 5).map((s, i) => (
-                                        <div key={s.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-white/5 last:border-0">
-                                            <span className="text-white/30 text-xs w-5 text-center font-bold">{i + 1}</span>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-white text-sm truncate">{s.name}</p>
-                                                <p className="text-white/40 text-xs">{s.wins}V {s.draws}E {s.losses}D</p>
-                                            </div>
-                                            <div className="text-right">
-                                                <span className="font-bold text-sm text-green-400">{s.winRate}%</span>
-                                                <p className="text-white/30 text-xs">{s.played} jogos</p>
-                                            </div>
-                                        </div>
+                                        <RankRow
+                                            key={s.id}
+                                            position={i + 1}
+                                            name={s.name}
+                                            detail={`${s.wins}V ${s.draws}E ${s.losses}D · ${s.played} jogos`}
+                                        >
+                                            <span className="font-display font-bold text-title tabular-nums text-success">{s.winRate}%</span>
+                                        </RankRow>
                                     ))}
-                                </div>
+                                </Card>
                             )}
 
                             {/* Melhor defesa */}
                             {bestDef.length > 0 && (
-                                <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
-                                    <div className="px-4 py-3 border-b border-white/10" style={{ backgroundColor: 'rgba(201,153,42,0.08)' }}>
-                                        <h3 className="font-bold text-sm" style={{ color: 'var(--color-gold)' }}>Melhor Defesa</h3>
-                                    </div>
+                                <Card>
+                                    <CardHeader title="Melhor Defesa" />
                                     {bestDef.slice(0, 5).map((s, i) => (
-                                        <div key={s.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-white/5 last:border-0">
-                                            <span className="text-white/30 text-xs w-5 text-center font-bold">{i + 1}</span>
-                                            <span className="flex-1 text-white text-sm truncate">{s.name}</span>
-                                            <span className="font-bold text-sm text-blue-400">{s.goals_against} sofridos</span>
-                                        </div>
+                                        <RankRow key={s.id} position={i + 1} name={s.name}>
+                                            <span className="font-display font-bold text-title tabular-nums text-info">{s.goals_against}</span>
+                                            <span className="text-caption text-muted ml-1">sofridos</span>
+                                        </RankRow>
                                     ))}
-                                </div>
+                                </Card>
                             )}
 
                             {allPlayed.length === 0 && (
-                                <p className="text-white/30 text-sm text-center py-8">Nenhuma partida jogada ainda.</p>
+                                <p className="text-body text-muted text-center py-8">Nenhuma partida jogada ainda.</p>
                             )}
                         </div>
                     )
                 })()}
 
-                {/* Tab: Jogadores */}
+                {/* Aba: Jogadores */}
                 {tab === 'jogadores' && (
                     <div className="flex flex-col gap-4">
                         {tournament.mode === '2v2' && duos.length > 0 ? (
-                            <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
-                                <div className="px-4 py-3 border-b border-white/10" style={{ backgroundColor: 'rgba(201,153,42,0.08)' }}>
-                                    <h3 className="font-bold text-sm" style={{ color: 'var(--color-gold)' }}>Duplas ({duos.length})</h3>
-                                </div>
+                            <Card>
+                                <CardHeader title={`Duplas (${duos.length})`} />
                                 {duos.map((duo, i) => {
                                     const isMyDuo = duo.player1?.id === profile?.id || duo.player2?.id === profile?.id
                                     return (
-                                        <button key={duo.id} onClick={() => setSelectedDuo(duo)}
-                                            className="w-full flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0 hover:bg-white/5 transition text-left">
-                                            <span className="text-white/30 text-xs w-5 text-center">{i + 1}</span>
+                                        <button key={duo.id} type="button" onClick={() => setSelectedDuo(duo)}
+                                            className="w-full flex items-center gap-3 px-card py-3 min-h-14 border-b border-subtle last:border-0 hover:bg-surface-hover transition-colors text-left">
+                                            <span className="w-5 text-center font-display font-bold text-body-lg tabular-nums text-muted">{i + 1}</span>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2">
-                                                    <p className="text-white text-sm font-bold truncate">{getEntityName(duo.id)}</p>
-                                                    {isMyDuo && (
-                                                        <span className="text-xs px-1.5 py-0.5 rounded font-bold flex-shrink-0"
-                                                            style={{ backgroundColor: 'rgba(201,153,42,0.2)', color: 'var(--color-gold)' }}>
-                                                            minha dupla
-                                                        </span>
-                                                    )}
+                                                    <p className="text-body font-semibold text-primary truncate">{getEntityName(duo.id)}</p>
+                                                    {isMyDuo && <Badge tone="brand" className="flex-shrink-0">minha dupla</Badge>}
                                                 </div>
-                                                <p className="text-white/40 text-xs mt-0.5">
+                                                <p className="text-caption text-muted mt-0.5 truncate">
                                                     {duo.player1?.username ?? duo.player1?.name ?? '?'} &amp; {duo.player2?.username ?? duo.player2?.name ?? '?'}
                                                 </p>
                                             </div>
-                                            <Pencil size={13} className="text-white/20 flex-shrink-0" />
+                                            <ChevronRight size={18} className="text-muted flex-shrink-0" aria-hidden />
                                         </button>
                                     )
                                 })}
-                            </div>
+                            </Card>
                         ) : (
-                            <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
+                            <Card>
                                 {players.length === 0 ? (
-                                    <p className="text-white/30 text-sm text-center py-8">Nenhum jogador ainda.</p>
+                                    <p className="text-body text-muted text-center py-8">Nenhum jogador ainda.</p>
                                 ) : players.map(player => (
-                                    <div key={player.id} className="flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0">
-                                        <div className="w-8 h-8 rounded-full overflow-hidden bg-white/10 flex-shrink-0 flex items-center justify-center border"
-                                            style={{ borderColor: 'var(--color-gold)' }}>
-                                            {player.avatar_url
-                                                ? <img src={player.avatar_url} alt="" className="w-full h-full object-cover" />
-                                                : <span className="text-white/40 text-sm font-bold">{player.name?.charAt(0) ?? '?'}</span>
-                                            }
-                                        </div>
+                                    <div key={player.id} className="flex items-center gap-3 px-card py-3 min-h-14 border-b border-subtle last:border-0">
+                                        <Avatar src={player.avatar_url} name={player.name} size="sm" />
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-white text-sm font-medium truncate">{player.name}</p>
-                                            {player.username && <span className="text-white/40 text-xs">@{player.username}</span>}
+                                            <p className="text-body font-semibold text-primary truncate">{player.name}</p>
+                                            {player.username && <p className="text-caption text-muted truncate">@{player.username}</p>}
                                         </div>
                                     </div>
                                 ))}
-                            </div>
+                            </Card>
                         )}
                     </div>
                 )}
@@ -739,33 +756,78 @@ export default function TournamentDashboard() {
     )
 }
 
-function MatchRow({ match, getEntityName, isAdmin, onEdit }: {
+// Linha de partida: mandante | placar | visitante. Vencedor em destaque, perdedor apagado.
+// showStage: mostra a fase (lista de mata-mata direto, onde as fases se misturam)
+export function MatchRow({ match, getEntityName, isAdmin, onEdit, showStage = false }: {
     match: Match
     getEntityName: (id: string) => string
     isAdmin: boolean
     onEdit: () => void
+    showStage?: boolean
 }) {
+    const winner = getWinner(match)
+    const nameClass = (entityId: string) => cx(
+        'truncate text-body',
+        !match.played ? 'text-primary'
+            : winner === null ? 'text-secondary'
+                : winner === entityId ? 'text-primary font-bold' : 'text-muted',
+    )
+
     return (
-        <div className="flex items-center gap-2 py-2 border-b border-white/5 last:border-0">
-            <span className="text-xs px-1.5 py-0.5 rounded font-bold flex-shrink-0"
-                style={{ backgroundColor: 'rgba(201,153,42,0.15)', color: 'var(--color-gold)' }}>
-                {STAGE_LABEL[match.stage] ?? match.stage}
-            </span>
-            <span className="flex-1 text-right text-sm text-white truncate">{getEntityName(match.home_id)}</span>
-            {match.played ? (
-                <span className="font-bold text-white px-2 flex-shrink-0 text-center">
-                    {match.home_score} × {match.away_score}
-                    {penaltiesLabel(match) && <span className="block text-white/40 text-xs font-normal">{penaltiesLabel(match)}</span>}
-                </span>
-            ) : (
-                <span className="text-white/30 px-2 flex-shrink-0 text-sm flex items-center gap-1"><Clock size={10} />vs</span>
-            )}
-            <span className="flex-1 text-left text-sm text-white truncate">{getEntityName(match.away_id)}</span>
+        <div className="flex items-center gap-2 px-card py-2 min-h-14 border-b border-subtle last:border-0">
+            {showStage && <Badge className="flex-shrink-0">{STAGE_LABEL[match.stage] ?? match.stage}</Badge>}
+            <div className="flex-1 min-w-0 grid grid-cols-[1fr_auto_1fr] items-center gap-2.5">
+                <span className={cx(nameClass(match.home_id), 'text-right')}>{getEntityName(match.home_id)}</span>
+                {match.played ? (
+                    <div className="min-w-16 text-center">
+                        <span className="font-display font-bold text-headline tabular-nums leading-none text-primary whitespace-nowrap">
+                            {match.home_score}<span className="text-faint mx-1.5">×</span>{match.away_score}
+                        </span>
+                        {penaltiesLabel(match) && (
+                            <span className="block text-caption text-muted tabular-nums">{penaltiesLabel(match)}</span>
+                        )}
+                    </div>
+                ) : (
+                    <span className="min-w-16 h-8 px-2 rounded-control bg-fill border border-subtle flex items-center justify-center gap-1 text-caption font-semibold uppercase text-muted">
+                        <Clock size={12} aria-hidden />vs
+                    </span>
+                )}
+                <span className={nameClass(match.away_id)}>{getEntityName(match.away_id)}</span>
+            </div>
             {isAdmin && (
-                <button onClick={onEdit} className="p-1.5 rounded border border-white/20 text-white/40 hover:text-white hover:border-white/40 transition flex-shrink-0">
-                    {match.played ? <Pencil size={12} /> : <Plus size={12} />}
+                <button
+                    type="button"
+                    onClick={onEdit}
+                    aria-label={match.played ? 'Editar resultado' : 'Lançar resultado'}
+                    className="h-9 w-9 flex-shrink-0 flex items-center justify-center rounded-control border border-default text-brand-text hover:bg-fill-strong hover:border-strong transition-colors"
+                >
+                    {match.played ? <Pencil size={14} /> : <Plus size={16} />}
                 </button>
             )}
+        </div>
+    )
+}
+
+// Linha de ranking da aba Stats: posição, nome e o número em destaque à direita
+function RankRow({ position, name, detail, children }: {
+    position: number
+    name: string
+    detail?: string
+    children: ReactNode
+}) {
+    return (
+        <div className="flex items-center gap-3 px-card py-2.5 min-h-12 border-b border-subtle last:border-0">
+            <span className={cx(
+                'w-5 text-center font-display font-bold text-body-lg tabular-nums',
+                position === 1 ? 'text-brand-text' : 'text-muted',
+            )}>
+                {position}
+            </span>
+            <div className="flex-1 min-w-0">
+                <p className="text-body text-primary truncate">{name}</p>
+                {detail && <p className="text-caption text-muted truncate">{detail}</p>}
+            </div>
+            <div className="flex items-baseline flex-shrink-0">{children}</div>
         </div>
     )
 }
@@ -783,84 +845,71 @@ function PlanConfirmModal({ plan, getEntityName, working, onCancel, onConfirm }:
     const lostResults = plan.remove.filter(m => m.played).length
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
-            <div className="w-full max-w-sm max-h-[85vh] flex flex-col rounded-2xl border border-white/10" style={{ backgroundColor: 'var(--color-green)' }}>
-                <div className="flex items-center justify-between p-6 pb-3">
-                    <h2 className="text-white font-bold text-lg flex items-center gap-2">
-                        <AlertTriangle size={18} className="text-yellow-400" /> Atualizar confrontos
-                    </h2>
-                    <button onClick={onCancel} className="text-white/40 hover:text-white transition"><X size={20} /></button>
+        <Modal
+            open
+            onClose={onCancel}
+            title="Atualizar confrontos"
+            size="md"
+            footer={<>
+                <Button variant="secondary" onClick={onCancel}>Cancelar</Button>
+                <Button variant="danger" onClick={onConfirm} loading={working}>
+                    {working ? 'Aplicando...' : 'Confirmar'}
+                </Button>
+            </>}
+        >
+            <div className="flex flex-col gap-4">
+                {lostResults > 0 && (
+                    <Alert>
+                        {lostResults} resultado{lostResults !== 1 ? 's' : ''} será{lostResults !== 1 ? 'ão' : ''} apagado{lostResults !== 1 ? 's' : ''}.
+                        Os confrontos que não mudaram continuam com o placar.
+                    </Alert>
+                )}
+
+                <div>
+                    <p className="text-label uppercase text-muted mb-1">Sai</p>
+                    {byStage(plan.remove).map(m => (
+                        <div key={m.id} className="flex items-center gap-2 py-2 text-body border-b border-subtle last:border-0">
+                            <span className="text-caption text-muted w-16 flex-shrink-0">{STAGE_LABEL[m.stage]}</span>
+                            <span className="flex-1 min-w-0 truncate text-primary">
+                                {getEntityName(m.home_id)} × {getEntityName(m.away_id)}
+                            </span>
+                            {m.played
+                                ? <span className="font-display font-bold tabular-nums text-danger flex-shrink-0">{m.home_score}×{m.away_score} <span className="font-sans font-normal text-caption">{penaltiesLabel(m)}</span></span>
+                                : <span className="text-caption text-muted flex-shrink-0">sem resultado</span>}
+                        </div>
+                    ))}
                 </div>
 
-                <div className="px-6 overflow-y-auto flex flex-col gap-4">
-                    {lostResults > 0 && (
-                        <p className="px-3 py-2 rounded-lg text-xs text-red-300 bg-red-500/10 border border-red-500/30">
-                            {lostResults} resultado{lostResults !== 1 ? 's' : ''} será{lostResults !== 1 ? 'ão' : ''} apagado{lostResults !== 1 ? 's' : ''}.
-                            Os confrontos que não mudaram continuam com o placar.
-                        </p>
-                    )}
-
+                {plan.add.length > 0 && (
                     <div>
-                        <p className="text-white/50 text-xs font-bold uppercase tracking-wider mb-2">Sai</p>
-                        {byStage(plan.remove).map(m => (
-                            <div key={m.id} className="flex items-center gap-2 py-1.5 text-sm border-b border-white/5 last:border-0">
-                                <span className="text-xs text-white/40 w-16 flex-shrink-0">{STAGE_LABEL[m.stage]}</span>
-                                <span className="flex-1 min-w-0 truncate text-white">
-                                    {getEntityName(m.home_id)} × {getEntityName(m.away_id)}
+                        <p className="text-label uppercase text-muted mb-1">Entra</p>
+                        {byStage(plan.add).map(a => (
+                            <div key={`${a.stage}-${a.match_order}`} className="flex items-center gap-2 py-2 text-body border-b border-subtle last:border-0">
+                                <span className="text-caption text-muted w-16 flex-shrink-0">{STAGE_LABEL[a.stage]}</span>
+                                <span className="flex-1 min-w-0 truncate text-success">
+                                    {getEntityName(a.home_id)} × {getEntityName(a.away_id)}
                                 </span>
-                                {m.played
-                                    ? <span className="text-red-300 text-xs flex-shrink-0">{m.home_score}×{m.away_score} {penaltiesLabel(m)}</span>
-                                    : <span className="text-white/30 text-xs flex-shrink-0">sem resultado</span>}
                             </div>
                         ))}
                     </div>
-
-                    {plan.add.length > 0 && (
-                        <div>
-                            <p className="text-white/50 text-xs font-bold uppercase tracking-wider mb-2">Entra</p>
-                            {byStage(plan.add).map(a => (
-                                <div key={`${a.stage}-${a.match_order}`} className="flex items-center gap-2 py-1.5 text-sm border-b border-white/5 last:border-0">
-                                    <span className="text-xs text-white/40 w-16 flex-shrink-0">{STAGE_LABEL[a.stage]}</span>
-                                    <span className="flex-1 min-w-0 truncate text-green-300">
-                                        {getEntityName(a.home_id)} × {getEntityName(a.away_id)}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                <div className="flex gap-3 p-6 pt-4">
-                    <button onClick={onCancel}
-                        className="flex-1 py-3 rounded-xl text-white border border-white/20 hover:bg-white/10 transition font-medium text-sm">
-                        Cancelar
-                    </button>
-                    <button onClick={onConfirm} disabled={working}
-                        className="flex-1 py-3 rounded-xl font-bold text-white text-sm transition disabled:opacity-50"
-                        style={{ backgroundColor: 'rgb(220,38,38)' }}>
-                        {working ? 'Aplicando...' : 'Confirmar'}
-                    </button>
-                </div>
+                )}
             </div>
-        </div>
+        </Modal>
     )
 }
 
-function ChampionCard({ name, onCelebrate }: { name: string; onCelebrate: () => void }) {
+export function ChampionCard({ name, onCelebrate }: { name: string; onCelebrate: () => void }) {
     return (
-        <div
-            className="px-4 py-4 rounded-xl text-center border"
-            style={{ borderColor: 'var(--color-gold)', backgroundColor: 'rgba(201,153,42,0.1)' }}
-        >
-            <p className="text-white/50 text-xs mb-1">🏆 Campeão do Campeonato</p>
-            <p className="font-bold text-xl" style={{ color: 'var(--color-gold)' }}>{name}</p>
-            <button
-                onClick={onCelebrate}
-                className="mt-2 text-xs px-3 py-1 rounded-full border border-white/20 text-white/40 hover:text-white hover:border-white/40 transition"
-            >
-                🎊 Celebrar novamente
-            </button>
-        </div>
+        <Card tone="accent">
+            <CardBody className="flex flex-col items-center text-center gap-1 py-6">
+                <Trophy size={32} className="text-brand" aria-hidden />
+                <p className="text-label uppercase text-muted mt-1">Campeão do campeonato</p>
+                <p className="font-display font-bold text-display uppercase text-brand-text leading-none break-words max-w-full">{name}</p>
+                <Button variant="ghost" size="sm" className="mt-2" onClick={onCelebrate}>
+                    🎊 Celebrar novamente
+                </Button>
+            </CardBody>
+        </Card>
     )
 }
 
@@ -894,104 +943,86 @@ function DuoModal({ duo, leagueMatches, canEdit, onClose, onSaved }: {
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
-            <div className="w-full max-w-sm max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10" style={{ backgroundColor: 'var(--color-green)' }}>
-                <div className="flex items-center justify-between p-6 pb-4">
-                    <div>
-                        <h2 className="text-white font-bold text-lg">Dupla</h2>
-                        <p className="text-white/40 text-xs mt-0.5">{displayName}</p>
-                    </div>
-                    <button onClick={onClose} className="text-white/40 hover:text-white transition"><X size={20} /></button>
-                </div>
-                <div className="px-6 pb-6 flex flex-col gap-4">
-                    <div className="flex flex-col gap-2">
-                        {[duo.player1, duo.player2].map((p, i) => p && (
-                            <Link key={i} to={`/player/${p.id}`} onClick={onClose}
-                                className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 transition">
-                                <div className="w-8 h-8 rounded-full overflow-hidden bg-white/10 flex-shrink-0 flex items-center justify-center border"
-                                    style={{ borderColor: 'var(--color-gold)' }}>
-                                    {p.avatar_url
-                                        ? <img src={p.avatar_url} alt="" className="w-full h-full object-cover" />
-                                        : <span className="text-white/40 text-sm font-bold">{p.name?.charAt(0) ?? '?'}</span>
-                                    }
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-white text-sm font-medium truncate">{p.name}</p>
-                                    {p.username && <p className="text-white/40 text-xs">@{p.username}</p>}
-                                </div>
-                                <ChevronRight size={14} className="text-white/30 flex-shrink-0" />
-                            </Link>
-                        ))}
-                    </div>
-
-                    {stats.played > 0 ? (
-                        <div className="rounded-xl bg-white/5 px-3 py-3">
-                            <p className="text-white/40 text-xs font-bold uppercase tracking-wider mb-2">Na liga</p>
-                            <div className="grid grid-cols-4 gap-2 text-center mb-3">
-                                {[
-                                    { label: 'J', value: stats.played, color: 'text-white' },
-                                    { label: 'V', value: stats.wins, color: 'text-green-400' },
-                                    { label: 'E', value: stats.draws, color: 'text-white/70' },
-                                    { label: 'D', value: stats.losses, color: 'text-red-400' },
-                                ].map(({ label, value, color }) => (
-                                    <div key={label}>
-                                        <p className={`font-bold text-lg ${color}`}>{value}</p>
-                                        <p className="text-white/40 text-xs">{label}</p>
-                                    </div>
-                                ))}
+        <Modal
+            open
+            onClose={onClose}
+            title="Dupla"
+            description={displayName}
+            footer={canEdit ? <>
+                <Button variant="secondary" onClick={onClose}>Cancelar</Button>
+                <Button onClick={handleSave} loading={saving} icon={<Save size={16} />}>
+                    {saving ? 'Salvando...' : 'Salvar'}
+                </Button>
+            </> : (
+                <Button variant="secondary" onClick={onClose}>Fechar</Button>
+            )}
+        >
+            <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-2">
+                    {[duo.player1, duo.player2].map((p, i) => p && (
+                        <Link key={i} to={`/player/${p.id}`} onClick={onClose}
+                            className="flex items-center gap-3 px-3 py-2.5 rounded-card bg-fill hover:bg-fill-strong transition-colors">
+                            <Avatar src={p.avatar_url} name={p.name} size="sm" />
+                            <div className="min-w-0 flex-1">
+                                <p className="text-body font-semibold text-primary truncate">{p.name}</p>
+                                {p.username && <p className="text-caption text-muted">@{p.username}</p>}
                             </div>
-                            <div className="grid grid-cols-3 gap-2 text-center pt-3 border-t border-white/10">
-                                <div>
-                                    <p className="font-bold text-white">{stats.goals_for}:{stats.goals_against}</p>
-                                    <p className="text-white/40 text-xs">Gols</p>
+                            <ChevronRight size={16} className="text-muted flex-shrink-0" aria-hidden />
+                        </Link>
+                    ))}
+                </div>
+
+                {stats.played > 0 ? (
+                    <div className="rounded-card bg-fill border border-subtle px-3 py-3">
+                        <p className="text-label uppercase text-muted mb-2">Na liga</p>
+                        <div className="grid grid-cols-4 gap-2 text-center mb-3">
+                            {[
+                                { label: 'J', value: stats.played, color: 'text-primary' },
+                                { label: 'V', value: stats.wins, color: 'text-success' },
+                                { label: 'E', value: stats.draws, color: 'text-secondary' },
+                                { label: 'D', value: stats.losses, color: 'text-danger' },
+                            ].map(({ label, value, color }) => (
+                                <div key={label}>
+                                    <p className={`font-display font-bold text-headline tabular-nums leading-none ${color}`}>{value}</p>
+                                    <p className="text-caption text-muted mt-1">{label}</p>
                                 </div>
-                                <div>
-                                    <p className={`font-bold ${stats.goal_diff > 0 ? 'text-green-400' : stats.goal_diff < 0 ? 'text-red-400' : 'text-white'}`}>
-                                        {stats.goal_diff > 0 ? `+${stats.goal_diff}` : stats.goal_diff}
-                                    </p>
-                                    <p className="text-white/40 text-xs">Saldo</p>
-                                </div>
-                                <div>
-                                    <p className="font-bold" style={{ color: 'var(--color-gold)' }}>{stats.points}</p>
-                                    <p className="text-white/40 text-xs">Pontos</p>
-                                </div>
+                            ))}
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-center pt-3 border-t border-subtle">
+                            <div>
+                                <p className="font-display font-bold text-title tabular-nums text-primary">{stats.goals_for}:{stats.goals_against}</p>
+                                <p className="text-caption text-muted">Gols</p>
+                            </div>
+                            <div>
+                                <p className={`font-display font-bold text-title tabular-nums ${stats.goal_diff > 0 ? 'text-success' : stats.goal_diff < 0 ? 'text-danger' : 'text-primary'}`}>
+                                    {stats.goal_diff > 0 ? `+${stats.goal_diff}` : stats.goal_diff}
+                                </p>
+                                <p className="text-caption text-muted">Saldo</p>
+                            </div>
+                            <div>
+                                <p className="font-display font-bold text-title tabular-nums text-brand-text">{stats.points}</p>
+                                <p className="text-caption text-muted">Pontos</p>
                             </div>
                         </div>
-                    ) : (
-                        <p className="text-white/30 text-xs text-center">Nenhum jogo da liga disputado ainda.</p>
-                    )}
+                    </div>
+                ) : (
+                    <p className="text-caption text-muted text-center">Nenhum jogo da liga disputado ainda.</p>
+                )}
 
-                    {canEdit && (
-                        <>
-                            <div>
-                                <label className="text-white/50 text-xs mb-1 block">Nome da dupla</label>
-                                <input type="text" value={duoName} onChange={e => setDuoName(e.target.value)}
-                                    placeholder="Ex: Os Crias" maxLength={40}
-                                    className="w-full px-4 py-3 rounded-xl bg-white/10 text-white placeholder-white/30 border border-white/20 focus:outline-none focus:border-yellow-500 text-sm" />
-                            </div>
-                            {error && <p className="text-red-400 text-sm text-center">{error}</p>}
-                            <div className="flex gap-3">
-                                <button onClick={onClose}
-                                    className="flex-1 py-3 rounded-xl text-white border border-white/20 hover:bg-white/10 transition font-medium text-sm">
-                                    Cancelar
-                                </button>
-                                <button onClick={handleSave} disabled={saving}
-                                    className="flex-1 py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 text-sm"
-                                    style={{ backgroundColor: 'var(--color-gold)', color: 'var(--color-green)' }}>
-                                    <Save size={14} />
-                                    {saving ? 'Salvando...' : 'Salvar'}
-                                </button>
-                            </div>
-                        </>
-                    )}
-                    {!canEdit && (
-                        <button onClick={onClose}
-                            className="w-full py-3 rounded-xl text-white border border-white/20 hover:bg-white/10 transition font-medium text-sm">
-                            Fechar
-                        </button>
-                    )}
-                </div>
+                {canEdit && (
+                    <>
+                        <Input
+                            label="Nome da dupla"
+                            type="text"
+                            value={duoName}
+                            onChange={e => setDuoName(e.target.value)}
+                            placeholder="Ex: Os Crias"
+                            maxLength={40}
+                        />
+                        {error && <Alert>{error}</Alert>}
+                    </>
+                )}
             </div>
-        </div>
+        </Modal>
     )
 }

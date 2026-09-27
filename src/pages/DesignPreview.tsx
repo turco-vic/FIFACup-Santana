@@ -10,8 +10,41 @@ import { buttonClasses } from '../components/ui/variants'
 import { useToast } from '../hooks/useToast'
 import { BottomNavBar } from '../components/BottomNav'
 import { HomeView } from './Home'
+import { ChampionCard, MatchRow } from './TournamentDashboard'
+import { TournamentCard } from './Tournaments'
+import GroupTable from '../components/GroupTable'
+import KnockoutBracket from '../components/KnockoutBracket'
+import ScoreModal from '../components/ScoreModal'
+import { computeStandings } from '../lib/standings'
+import type { Match, Profile, Tournament } from '../types'
 
 // Vitrine do design system (D2). Só existe em desenvolvimento: /design
+
+// ---- Dados de exemplo para as telas do campeonato (D6)
+const P = (id: string, name: string, team: string | null = null): Profile => ({
+    id, name, username: name.toLowerCase(), avatar_url: null, team_name: team,
+    role: 'player', status: 'active', created_at: '',
+})
+const DEMO_PLAYERS = [P('p1', 'Enzo', 'Real Madrid'), P('p2', 'Lucas', 'Barcelona'), P('p3', 'Pedro'), P('p4', 'João')]
+const M = (id: string, stage: Match['stage'], order: number, home: string, away: string,
+    hs: number | null = null, as_: number | null = null, hp: number | null = null, ap: number | null = null): Match => ({
+    id, tournament_id: 't', mode: '1v1', stage, home_id: home, away_id: away, home_score: hs, away_score: as_,
+    home_penalties: hp, away_penalties: ap, played: hs !== null, match_order: order, created_at: '',
+})
+const DEMO_GROUP = [
+    M('g1', 'groups', 0, 'p1', 'p2', 3, 1), M('g2', 'groups', 1, 'p3', 'p4', 2, 2),
+    M('g3', 'groups', 2, 'p1', 'p3', 1, 0), M('g4', 'groups', 3, 'p2', 'p4', 4, 2),
+    M('g5', 'groups', 4, 'p1', 'p4'), M('g6', 'groups', 5, 'p2', 'p3'),
+]
+const DEMO_KO = [
+    M('k1', 'semis', 0, 'p1', 'p4', 2, 2, 4, 3), M('k2', 'semis', 1, 'p2', 'p3', 1, 0),
+    M('k3', 'final', 0, 'p1', 'p2'),
+]
+const demoName = (id: string) => DEMO_PLAYERS.find(p => p.id === id)?.username ?? '?'
+const T = (id: string, name: string, status: Tournament['status'], mode: Tournament['mode'], format: Tournament['format']): Tournament => ({
+    id, name, status, mode, format, date: '2026-09-27', location: null, description: null,
+    invite_code: 'ABC123', created_by: null, created_at: '',
+})
 function Section({ title, children }: { title: string; children: ReactNode }) {
     return (
         <section className="flex flex-col gap-4">
@@ -25,9 +58,9 @@ export default function DesignPreview() {
     const { showToast } = useToast()
     const [params] = useSearchParams()
     // ?modal=form|danger e ?toast=success|error|warning|info abrem direto (para prints)
-    const [modal, setModal] = useState<null | 'form' | 'danger'>(() => {
+    const [modal, setModal] = useState<null | 'form' | 'danger' | 'score'>(() => {
         const m = params.get('modal')
-        return m === 'form' || m === 'danger' ? m : null
+        return m === 'form' || m === 'danger' || m === 'score' ? m : null
     })
     useEffect(() => {
         const t = params.get('toast')
@@ -309,6 +342,27 @@ export default function DesignPreview() {
                     </div>
                 </Section>
 
+                {/* ---------------------------------------------------------- Campeonato (D6) */}
+                <Section title="Campeonato | lista, grupo, mata-mata (dados de exemplo)">
+                    <div className="w-[390px] max-w-full flex flex-col gap-4">
+                        <TournamentCard tournament={T('a', 'Copa Santana 2026', 'active', '1v1', 'groups_knockout')} />
+                        <TournamentCard tournament={T('b', 'Liga das Duplas', 'finished', '2v2', 'league_final')} />
+
+                        <Card>
+                            <CardHeader title="Grupo A" subtitle="4 de 6 jogos" />
+                            <GroupTable standings={computeStandings(DEMO_PLAYERS.map(p => ({ id: p.id, name: p.username ?? '' })), DEMO_GROUP)} qualifiers={2} />
+                            <div className="border-t border-subtle">
+                                {DEMO_GROUP.map(m => (
+                                    <MatchRow key={m.id} match={m} getEntityName={demoName} isAdmin onEdit={() => setModal('score')} />
+                                ))}
+                            </div>
+                        </Card>
+
+                        <KnockoutBracket matches={DEMO_KO} players={DEMO_PLAYERS} isAdmin onSelectMatch={() => setModal('score')} />
+                        <ChampionCard name="enzo" onCelebrate={() => showToast('Celebrar (demonstração)', 'info')} />
+                    </div>
+                </Section>
+
                 {/* ---------------------------------------------------------- Modal + Toast */}
                 <Section title="Modal e Toast">
                     <div className="flex flex-wrap gap-3">
@@ -323,6 +377,16 @@ export default function DesignPreview() {
                     </div>
                 </Section>
             </div>
+
+            {/* Modal de placar real, com um empate de mata-mata (pede pênaltis) */}
+            {modal === 'score' && (
+                <ScoreModal
+                    match={M('k9', 'semis', 0, 'p1', 'p4', 2, 2)}
+                    homeName="enzo"
+                    awayName="joão"
+                    onClose={() => setModal(null)}
+                />
+            )}
 
             <Modal
                 open={modal === 'form'}
