@@ -20,39 +20,40 @@ export default function Tournaments() {
     const [tournaments, setTournaments] = useState<Tournament[]>([])
     const [loading, setLoading] = useState(true)
 
+    const profileId = profile?.id
+
     useEffect(() => {
-        if (!profile) return
-        fetchTournaments()
-    }, [profile?.id, isSupreme])
-
-    async function fetchTournaments() {
-        if (isSupreme) {
-            const { data } = await supabase
-                .from('tournaments')
-                .select('*')
-                .order('created_at', { ascending: false })
-            setTournaments(data ?? [])
-        } else {
-            const { data: tp } = await supabase
-                .from('tournament_players')
-                .select('tournament_id')
-                .eq('player_id', profile!.id)
-
-            const ids = (tp ?? []).map(t => t.tournament_id)
-
-            if (ids.length === 0) {
-                setTournaments([])
-            } else {
+        if (!profileId) return
+        async function fetchTournaments() {
+            if (isSupreme) {
                 const { data } = await supabase
                     .from('tournaments')
                     .select('*')
-                    .in('id', ids)
                     .order('created_at', { ascending: false })
                 setTournaments(data ?? [])
+            } else {
+                const { data: tp } = await supabase
+                    .from('tournament_players')
+                    .select('tournament_id')
+                    .eq('player_id', profileId)
+
+                const ids = (tp ?? []).map(t => t.tournament_id)
+
+                if (ids.length === 0) {
+                    setTournaments([])
+                } else {
+                    const { data } = await supabase
+                        .from('tournaments')
+                        .select('*')
+                        .in('id', ids)
+                        .order('created_at', { ascending: false })
+                    setTournaments(data ?? [])
+                }
             }
+            setLoading(false)
         }
-        setLoading(false)
-    }
+        fetchTournaments()
+    }, [profileId, isSupreme])
 
     if (loading) {
         return (

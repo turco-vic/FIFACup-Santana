@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { useNavigate } from 'react-router-dom'
-import { useToast } from '../contexts/ToastContext'
+import { useToast } from '../hooks/useToast'
 import type { Profile } from '../types'
 import {
     Users, LogOut, Pencil,

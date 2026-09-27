@@ -119,4 +119,8 @@ Levantamento: comparação dos arquivos removidos na Fase 1 (`10db328^`) com o s
     eram builds sem `.env`: `supabase.ts` lança erro sem as variáveis, o Vite as troca por constantes
     e o minificador descarta o app inteiro. `vite.config.ts` agora faz o build falhar sem
     `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`. Opcional: dividir por rota (lazy) para sair do aviso > 500 kB.
-- [ ] Lint zerado.
+- [x] **L3** — lint zerado (`npx eslint .` sem problemas):
+  - `any`: tipo `BeforeInstallPromptEvent` no `usePWA`; linhas do Supabase tipadas no Manage.
+  - Dependências de `useEffect`: `fetchAll` do Dashboard e do Manage virou `useCallback`
+    (`navigate`, `profile?.id`, `isSupreme`); Tournaments e TopScorers buscam dentro do efeito com `profileId`.
+  - Fast refresh: contexto e `useToast` foram para `src/hooks/useToast.ts`; `ToastContext.tsx` só exporta o provider.

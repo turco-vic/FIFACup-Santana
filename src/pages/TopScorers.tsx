@@ -23,8 +23,10 @@ export default function TopScorers() {
         ?? (tournaments.find(t => t.status === 'active') ?? tournaments[0])?.id
         ?? null
 
+    const profileId = profile?.id
+
     useEffect(() => {
-        if (!profile) return
+        if (!profileId) return
         async function fetchTournaments() {
             let query = supabase
                 .from('tournaments')
@@ -33,7 +35,7 @@ export default function TopScorers() {
                 .order('created_at', { ascending: false })
             if (!isSupreme) {
                 const { data: tp } = await supabase
-                    .from('tournament_players').select('tournament_id').eq('player_id', profile!.id)
+                    .from('tournament_players').select('tournament_id').eq('player_id', profileId)
                 const ids = (tp ?? []).map(t => t.tournament_id)
                 if (ids.length === 0) { setLoading(false); return }
                 query = query.in('id', ids)
@@ -43,7 +45,7 @@ export default function TopScorers() {
             setLoading(false)
         }
         fetchTournaments()
-    }, [profile?.id, isSupreme])
+    }, [profileId, isSupreme])
 
     useEffect(() => {
         if (!selectedId) { setPlayers([]); return }

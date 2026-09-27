@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, check } from '../lib/supabase'
 import { STATUS_LABEL } from '../lib/labels'
 import { shuffle } from '../lib/shuffle'
 import { POOL, draftProblem, emptyDraft, moveInDraft, type DraftTarget, type GroupDraft } from '../lib/groupDraft'
 import { useAuth } from '../hooks/useAuth'
-import { useToast } from '../contexts/ToastContext'
+import { useToast } from '../hooks/useToast'
 import type { Tournament, Profile, TournamentPlayer } from '../types'
 import { ArrowLeft, Users, AlertTriangle, Shuffle, UserMinus, RefreshCw, X, Check, Hand } from 'lucide-react'
 import { Skeleton } from '../components/Skeleton'
@@ -43,12 +43,7 @@ export default function TournamentManage() {
     const [movingPid, setMovingPid] = useState<string | null>(null)
     const [savedGroups, setSavedGroups] = useState<string[][]>([])
 
-    useEffect(() => {
-        if (authLoading) return
-        if (id) fetchAll(id)
-    }, [id, authLoading, profile?.id])
-
-    async function fetchAll(tid: string) {
+    const fetchAll = useCallback(async (tid: string) => {
         setLoading(true)
         const [{ data: t }, { data: tp }, { data: d }, { data: g }] = await Promise.all([
             supabase.from('tournaments').select('*').eq('id', tid).single(),
@@ -65,25 +60,32 @@ export default function TournamentManage() {
 
         if (!t) { navigate('/'); return }
 
-        const me = (tp ?? []).find((p: any) => p.player_id === profile?.id)
+        const tpList = (tp ?? []) as (TournamentPlayer & { profile: Profile })[]
+        const duoRows = (d ?? []) as { id: string; player1_id: string; player2_id: string }[]
+        const me = tpList.find(p => p.player_id === profile?.id)
         if (!isSupreme && me?.role !== 'admin') {
             navigate(`/tournament/${tid}`)
             return
         }
 
         setTournament(t)
-        setPlayers((tp as any[]) ?? [])
-        setSavedDuos(d ?? [])
+        setPlayers(tpList)
+        setSavedDuos(duoRows)
         setSavedGroups((g ?? []).map(group =>
             (gm ?? []).filter(m => m.group_id === group.id).map(m => m.player_id)))
 
         // Se já tem duplas salvas, carrega no estado local
-        if (d && d.length > 0) {
-            setDuos(d.map((duo: any) => ({ p1: duo.player1_id, p2: duo.player2_id })))
+        if (duoRows.length > 0) {
+            setDuos(duoRows.map(duo => ({ p1: duo.player1_id, p2: duo.player2_id })))
         }
 
         setLoading(false)
-    }
+    }, [navigate, profile?.id, isSupreme])
+
+    useEffect(() => {
+        if (authLoading) return
+        if (id) fetchAll(id)
+    }, [id, authLoading, fetchAll])
 
     async function handleRemovePlayer(playerId: string) {
         if (!id) return

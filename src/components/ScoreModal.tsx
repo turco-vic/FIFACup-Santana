@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Match } from '../types'
 import { X } from 'lucide-react'
-import { useToast } from '../contexts/ToastContext'
+import { useToast } from '../hooks/useToast'
 import { isKnockoutStage } from '../lib/matches'
 
 type Props = {

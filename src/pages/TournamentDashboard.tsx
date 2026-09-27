@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { supabase, check } from '../lib/supabase'
 import { getWinner, penaltiesLabel } from '../lib/matches'
 import { KO_STAGE_ORDER, firstRoundFromGroups, planBracket, planIsEmpty, type BracketPlan, type Pair } from '../lib/bracket'
 import { formatDate } from '../lib/format'
 import { useAuth } from '../hooks/useAuth'
-import { useToast } from '../contexts/ToastContext'
+import { useToast } from '../hooks/useToast'
 import { computeStandings, profileEntity, tiedOnAllCriteria, type Entity } from '../lib/standings'
 import { FORMAT_LABEL, STATUS_LABEL } from '../lib/labels'
 import GroupTable from '../components/GroupTable'
@@ -78,34 +78,8 @@ export default function TournamentDashboard() {
     const [pendingPlan, setPendingPlan] = useState<BracketPlan | null>(null)
     const [showConfetti, setShowConfetti] = useState(false)
 
-    useEffect(() => {
-        if (authLoading) return
-        if (id) fetchAll(id)
-    }, [id, authLoading, profile?.id])
-
-    // I6: resultados e fases geradas por outro admin aparecem sem recarregar a página.
-    // Gerar partidas dispara um evento por linha, então as atualizações são agrupadas.
-    // (DELETE não passa pelo filtro do realtime; reset só aparece ao recarregar.)
-    useEffect(() => {
-        if (authLoading || !id) return
-        let timer: ReturnType<typeof setTimeout> | undefined
-        const channel = supabase
-            .channel(`matches:${id}`)
-            .on('postgres_changes',
-                { event: '*', schema: 'public', table: 'matches', filter: `tournament_id=eq.${id}` },
-                () => {
-                    clearTimeout(timer)
-                    timer = setTimeout(() => fetchAll(id, { silent: true }), 400)
-                })
-            .subscribe()
-        return () => {
-            clearTimeout(timer)
-            supabase.removeChannel(channel)
-        }
-    }, [id, authLoading, profile?.id])
-
     // silent: atualiza sem trocar a tela pelo skeleton (usado pelo realtime)
-    async function fetchAll(tid: string, { silent = false } = {}) {
+    const fetchAll = useCallback(async (tid: string, { silent = false } = {}) => {
         if (!silent) setLoading(true)
         const [{ data: t }, { data: tp }, { data: m }, { data: d }, { data: g }] = await Promise.all([
             supabase.from('tournaments').select('*').eq('id', tid).single(),
@@ -148,7 +122,33 @@ export default function TournamentDashboard() {
         else { setNotMember(true) }
 
         setLoading(false)
-    }
+    }, [navigate, profile?.id, isSupreme])
+
+    useEffect(() => {
+        if (authLoading) return
+        if (id) fetchAll(id)
+    }, [id, authLoading, fetchAll])
+
+    // I6: resultados e fases geradas por outro admin aparecem sem recarregar a página.
+    // Gerar partidas dispara um evento por linha, então as atualizações são agrupadas.
+    // (DELETE não passa pelo filtro do realtime; reset só aparece ao recarregar.)
+    useEffect(() => {
+        if (authLoading || !id) return
+        let timer: ReturnType<typeof setTimeout> | undefined
+        const channel = supabase
+            .channel(`matches:${id}`)
+            .on('postgres_changes',
+                { event: '*', schema: 'public', table: 'matches', filter: `tournament_id=eq.${id}` },
+                () => {
+                    clearTimeout(timer)
+                    timer = setTimeout(() => fetchAll(id, { silent: true }), 400)
+                })
+            .subscribe()
+        return () => {
+            clearTimeout(timer)
+            supabase.removeChannel(channel)
+        }
+    }, [id, authLoading, fetchAll])
 
     function getEntityName(entityId: string): string {
         const duo = duos.find(d => d.id === entityId)

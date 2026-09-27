@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { formatDate } from '../lib/format'
 import { FORMAT_LABEL } from '../lib/labels'
 import { useAuth } from '../hooks/useAuth'
-import { useToast } from '../contexts/ToastContext'
+import { useToast } from '../hooks/useToast'
 import { ArrowLeft, Hash, Swords, Handshake } from 'lucide-react'
 import type { Tournament } from '../types'
 

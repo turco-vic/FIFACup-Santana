@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { useToast } from '../contexts/ToastContext'
+import { useToast } from '../hooks/useToast'
 import type { TournamentMode, TournamentFormat } from '../types'
 import { ArrowLeft, Swords, Handshake, Trophy, List } from 'lucide-react'
 

@@ -1,7 +1,13 @@
 import { useState, useEffect } from 'react'
 
+// Evento do Chrome/Edge para instalar o PWA; não está nos tipos padrão do DOM
+type BeforeInstallPromptEvent = Event & {
+    prompt: () => Promise<void>
+    userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
+}
+
 export function usePWA() {
-    const [installPrompt, setInstallPrompt] = useState<Event | null>(null)
+    const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
     const [isInstalled, setIsInstalled] = useState(false)
 
     useEffect(() => {
@@ -18,7 +24,7 @@ export function usePWA() {
         // Captura o evento de instalação
         const handler = (e: Event) => {
             e.preventDefault()
-            setInstallPrompt(e)
+            setInstallPrompt(e as BeforeInstallPromptEvent)
         }
 
         window.addEventListener('beforeinstallprompt', handler)
@@ -27,9 +33,8 @@ export function usePWA() {
 
     async function install() {
         if (!installPrompt) return
-        const prompt = installPrompt as any
-        prompt.prompt()
-        const { outcome } = await prompt.userChoice
+        installPrompt.prompt()
+        const { outcome } = await installPrompt.userChoice
         if (outcome === 'accepted') {
             setIsInstalled(true)
             setInstallPrompt(null)

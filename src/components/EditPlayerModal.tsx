@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Profile } from '../types'
 import { X, Save } from 'lucide-react'
-import { useToast } from '../contexts/ToastContext'
+import { useToast } from '../hooks/useToast'
 
 type Props = {
     player: Profile
