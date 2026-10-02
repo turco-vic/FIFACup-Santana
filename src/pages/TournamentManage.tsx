@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { supabase, check } from '../lib/supabase'
+import { supabase, check, deleteTournamentMatches } from '../lib/supabase'
 import { STATUS_LABEL } from '../lib/labels'
 import { shuffle } from '../lib/shuffle'
+import { drawGroups, planGroups, roundRobinPairs } from '../lib/groups'
 import { POOL, draftProblem, emptyDraft, moveInDraft, type DraftTarget, type GroupDraft } from '../lib/groupDraft'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../hooks/useToast'
@@ -21,15 +22,6 @@ import { cx } from '../lib/cx'
 type Duo = { p1: string; p2: string }
 
 const groupName = (index: number) => `Grupo ${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[index]}`
-
-// Top 2 de cada grupo avançam: o nº de grupos precisa ser potência de 2 para a chave fechar
-// (2 grupos → semis, 4 → quartas, 8 → oitavas). Retorna null se o nº de jogadores não é suportado.
-function planGroups(playerCount: number): number | null {
-    if (playerCount >= 4 && playerCount <= 7) return 2
-    if (playerCount >= 8 && playerCount <= 20) return 4
-    if (playerCount >= 21 && playerCount <= 40) return 8
-    return null
-}
 
 export default function TournamentManage() {
     const { id } = useParams<{ id: string }>()
@@ -234,10 +226,7 @@ export default function TournamentManage() {
             showToast('Grupos + mata-mata aceita de 4 a 40 jogadores.', 'warning')
             return
         }
-        // Distribuição round-robin: tamanhos diferem no máximo em 1, nunca há grupo vazio
-        const buckets: string[][] = Array.from({ length: numGroups }, () => [])
-        shuffle(players.map(p => p.player_id)).forEach((pid, i) => buckets[i % numGroups].push(pid))
-        setDraft({ groups: buckets, pool: [] })
+        setDraft({ groups: drawGroups(players.map(p => p.player_id), numGroups), pool: [] })
         setMovingPid(null)
     }
 
@@ -300,7 +289,7 @@ export default function TournamentManage() {
             if (tournament.mode === '2v2') {
                 await generateLeague2v2(savedDuos.map(d => d.id))
             } else {
-                check(await supabase.from('matches').delete().eq('tournament_id', id))
+                await deleteTournamentMatches(id)
                 if (tournament.format === 'groups_knockout') await generateGroups(draft!.groups)
                 else if (tournament.format === 'league') await generateLeague1v1(playerIds)
             }
@@ -320,22 +309,11 @@ export default function TournamentManage() {
     // As funções generate* lançam o erro do Supabase; handleGenerateMatches trata
     async function generateLeague2v2(duoIds: string[]) {
         if (!id) return
-        check(await supabase.from('matches').delete().eq('tournament_id', id))
-        const matchesToInsert = []
-        for (let i = 0; i < duoIds.length; i++) {
-            for (let j = i + 1; j < duoIds.length; j++) {
-                matchesToInsert.push({
-                    tournament_id: id,
-                    mode: '2v2',
-                    stage: 'league',
-                    home_id: duoIds[i],
-                    away_id: duoIds[j],
-                    played: false,
-                    match_order: matchesToInsert.length,
-                })
-            }
-        }
-        check(await supabase.from('matches').insert(matchesToInsert))
+        await deleteTournamentMatches(id)
+        check(await supabase.from('matches').insert(roundRobinPairs(duoIds).map(([home, away], i) => ({
+            tournament_id: id, mode: '2v2', stage: 'league',
+            home_id: home, away_id: away, played: false, match_order: i,
+        }))))
     }
 
     // Grava os grupos do sorteio revisado na tela e as partidas de cada grupo
@@ -355,34 +333,20 @@ export default function TournamentManage() {
             const groupPlayers = buckets[g]
             check(await supabase.from('group_members').insert(groupPlayers.map(pid => ({ group_id: group.id, player_id: pid }))))
 
-            const matchesToInsert = []
-            for (let i = 0; i < groupPlayers.length; i++) {
-                for (let j = i + 1; j < groupPlayers.length; j++) {
-                    matchesToInsert.push({
-                        tournament_id: id, mode: '1v1', stage: 'groups',
-                        home_id: groupPlayers[i], away_id: groupPlayers[j],
-                        played: false, match_order: matchesToInsert.length,
-                    })
-                }
-            }
-            check(await supabase.from('matches').insert(matchesToInsert))
+            check(await supabase.from('matches').insert(roundRobinPairs(groupPlayers).map(([home, away], i) => ({
+                tournament_id: id, mode: '1v1', stage: 'groups',
+                home_id: home, away_id: away, played: false, match_order: i,
+            }))))
         }
     }
 
     async function generateLeague1v1(playerIds: string[]) {
         if (!id) return
-        check(await supabase.from('matches').delete().eq('tournament_id', id))
-        const matchesToInsert = []
-        for (let i = 0; i < playerIds.length; i++) {
-            for (let j = i + 1; j < playerIds.length; j++) {
-                matchesToInsert.push({
-                    tournament_id: id, mode: '1v1', stage: 'league',
-                    home_id: playerIds[i], away_id: playerIds[j],
-                    played: false, match_order: matchesToInsert.length,
-                })
-            }
-        }
-        check(await supabase.from('matches').insert(matchesToInsert))
+        await deleteTournamentMatches(id)
+        check(await supabase.from('matches').insert(roundRobinPairs(playerIds).map(([home, away], i) => ({
+            tournament_id: id, mode: '1v1', stage: 'league',
+            home_id: home, away_id: away, played: false, match_order: i,
+        }))))
     }
 
     async function handleReset() {
@@ -393,7 +357,7 @@ export default function TournamentManage() {
             if (existingGroups && existingGroups.length > 0) {
                 check(await supabase.from('group_members').delete().in('group_id', existingGroups.map(g => g.id)))
             }
-            check(await supabase.from('matches').delete().eq('tournament_id', id))
+            await deleteTournamentMatches(id)
             check(await supabase.from('groups').delete().eq('tournament_id', id))
             check(await supabase.from('duos').delete().eq('tournament_id', id))
             check(await supabase.from('tournaments').update({ status: 'setup' }).eq('id', id))

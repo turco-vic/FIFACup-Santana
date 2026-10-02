@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { generateUniqueInviteCode } from '../lib/inviteCode'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../hooks/useToast'
 import type { TournamentMode, TournamentFormat } from '../types'
@@ -39,11 +40,6 @@ export default function CreateTournament() {
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState('')
 
-    function generateCode(): string {
-        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-        return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
-    }
-
     async function handleCreate() {
         if (!name.trim()) { setError('Nome obrigatório.'); return }
         if (!mode) { setError('Selecione o modo.'); return }
@@ -53,18 +49,14 @@ export default function CreateTournament() {
         setSaving(true)
         setError('')
 
-        // Gerar código único
-        let invite_code = generateCode()
-        let attempts = 0
-        while (attempts < 5) {
-            const { data } = await supabase
-                .from('tournaments')
-                .select('id')
-                .eq('invite_code', invite_code)
-                .single()
-            if (!data) break
-            invite_code = generateCode()
-            attempts++
+        const invite_code = await generateUniqueInviteCode(async code => {
+            const { data } = await supabase.from('tournaments').select('id').eq('invite_code', code).maybeSingle()
+            return !!data
+        })
+        if (!invite_code) {
+            setError('Erro ao criar campeonato. Tente de novo.')
+            setSaving(false)
+            return
         }
 
         const { data: tournament, error: tError } = await supabase

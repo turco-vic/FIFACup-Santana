@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { formatDate } from '../lib/format'
+import { INVITE_CODE_LENGTH, normalizeInviteCode } from '../lib/inviteCode'
 import { FORMAT_LABEL } from '../lib/labels'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../hooks/useToast'
@@ -27,8 +28,8 @@ export default function JoinTournament() {
     const [error, setError] = useState('')
 
     async function handleSearch() {
-        const clean = code.trim().toUpperCase()
-        if (clean.length !== 6) {
+        const clean = normalizeInviteCode(code)
+        if (clean.length !== INVITE_CODE_LENGTH) {
             setError('Código deve ter 6 caracteres.')
             return
         }
@@ -41,7 +42,7 @@ export default function JoinTournament() {
             .from('tournaments')
             .select('*')
             .eq('invite_code', clean)
-            .single()
+            .maybeSingle()
 
         if (!tournament) {
             setError('Campeonato não encontrado. Verifique o código.')
@@ -55,7 +56,7 @@ export default function JoinTournament() {
             .select('id')
             .eq('tournament_id', tournament.id)
             .eq('player_id', profile!.id)
-            .single()
+            .maybeSingle()
 
         setFound(tournament)
         setAlreadyJoined(!!existing)
@@ -108,13 +109,13 @@ export default function JoinTournament() {
                             type="text"
                             value={code}
                             onChange={e => {
-                                setCode(e.target.value.toUpperCase())
+                                // Código colado de mensagem vem com espaço/traço: fica só com letras e números
+                                setCode(normalizeInviteCode(e.target.value))
                                 setFound(null)
                                 setError('')
                             }}
                             onKeyDown={e => e.key === 'Enter' && handleSearch()}
                             placeholder="Ex: ABC123"
-                            maxLength={6}
                             autoComplete="off"
                             autoCapitalize="characters"
                             spellCheck={false}
@@ -123,7 +124,7 @@ export default function JoinTournament() {
                         {error && <Alert>{error}</Alert>}
 
                         <Button fullWidth size="lg" icon={<Search size={18} />} onClick={handleSearch}
-                            disabled={searching || code.trim().length !== 6}>
+                            disabled={searching || code.length !== INVITE_CODE_LENGTH}>
                             {searching ? 'Buscando...' : 'Buscar campeonato'}
                         </Button>
                     </CardBody>

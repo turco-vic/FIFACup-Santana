@@ -28,6 +28,15 @@ export default function Supreme() {
 
     useEffect(() => {
         fetchProfiles()
+        // No evento o supreme fica com esta tela aberta aprovando quem chega (e o app instalado
+        // no iPhone não tem "puxar para atualizar"): busca de novo a cada 10 s e ao voltar ao app
+        const timer = setInterval(fetchProfiles, 10_000)
+        const onVisible = () => { if (document.visibilityState === 'visible') fetchProfiles() }
+        document.addEventListener('visibilitychange', onVisible)
+        return () => {
+            clearInterval(timer)
+            document.removeEventListener('visibilitychange', onVisible)
+        }
     }, [])
 
     async function fetchProfiles() {

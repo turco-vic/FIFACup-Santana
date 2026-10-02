@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { supabase, check } from '../lib/supabase'
+import { supabase, check, deleteMatches } from '../lib/supabase'
 import { getWinner, penaltiesLabel } from '../lib/matches'
-import { KO_STAGE_ORDER, firstRoundFromGroups, planBracket, planIsEmpty, type BracketPlan, type Pair } from '../lib/bracket'
+import {
+    KO_STAGE_ORDER, bracketFromGroups, nextStageToGenerate, planBracket, planIsEmpty,
+    type BracketPlan, type Pair,
+} from '../lib/bracket'
 import { formatDate } from '../lib/format'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../hooks/useToast'
@@ -32,11 +35,6 @@ const STAGE_LABEL: Record<string, string> = {
     groups: 'Grupos', round32: '16avos', round16: 'Oitavas',
     quarters: 'Quartas', semis: 'Semifinal',
     final: 'Final', league: 'Liga', knockout: 'Mata-mata',
-}
-
-// 1ª fase do mata-mata conforme o nº de grupos (2 primeiros de cada avançam)
-const FIRST_KO_STAGE: Record<number, MatchStage> = {
-    2: 'semis', 4: 'quarters', 8: 'round16', 16: 'round32',
 }
 
 const STAGE_TITLE: Record<string, string> = {
@@ -213,9 +211,7 @@ export default function TournamentDashboard() {
         setPendingPlan(null)
         setGeneratingBracket(true)
         try {
-            if (plan.remove.length > 0) {
-                check(await supabase.from('matches').delete().in('id', plan.remove.map(m => m.id)))
-            }
+            await deleteMatches(plan.remove.map(m => m.id))
             if (plan.add.length > 0) {
                 check(await supabase.from('matches').insert(plan.add.map(a => ({
                     ...a, tournament_id: id, mode: tournament.mode, played: false,
@@ -255,18 +251,13 @@ export default function TournamentDashboard() {
     const championId = (finalMatch ? getWinner(finalMatch) : null) ?? leagueChampionId
     const hasChampion = !!championId
 
-    const allGroupsPlayed = groupMatches.length > 0 && groupMatches.every(m => m.played)
     const koMatches = matches.filter(m => KO_STAGE_ORDER.includes(m.stage))
 
     // De onde sai a 1ª fase eliminatória: ranking dos grupos, ou os 2 primeiros da liga (liga + final).
     // null enquanto a fase anterior não terminou.
     const bracketSource: { firstStage: MatchStage; pairs: Pair[] } | null = (() => {
         if (tournament?.format === 'groups_knockout') {
-            const firstStage = FIRST_KO_STAGE[groups.length]
-            if (!firstStage || !allGroupsPlayed) return null
-            const rankings = groups.map(g =>
-                computeStandings(g.players.map(profileEntity), groupMatchesOf(g)).map(st => st.id))
-            return { firstStage, pairs: firstRoundFromGroups(rankings) }
+            return bracketFromGroups(groups.map(g => g.players.map(profileEntity)), matches)
         }
         if (tournament?.format === 'league_final') {
             if (!allLeaguePlayed || leagueStandings.length < 2) return null
@@ -275,19 +266,23 @@ export default function TournamentDashboard() {
         return null
     })()
 
-    // Próxima fase a gerar: a 1ª, ou a seguinte à última existente quando ela terminou
-    const nextStage: MatchStage | null = (() => {
-        if (!bracketSource) return null
-        const stages = KO_STAGE_ORDER.slice(KO_STAGE_ORDER.indexOf(bracketSource.firstStage))
-        const existing = stages.filter(st => koMatches.some(m => m.stage === st))
-        if (existing.length === 0) return bracketSource.firstStage
-        const last = existing[existing.length - 1]
-        if (last === 'final' || !koMatches.filter(m => m.stage === last).every(m => m.played)) return null
-        return stages[stages.indexOf(last) + 1]
-    })()
+    const nextStage = bracketSource
+        ? nextStageToGenerate(bracketSource.firstStage, bracketSource.pairs.length, koMatches)
+        : null
+
+    // Placar corrigido depois de gerar a fase seguinte: algum confronto do mata-mata não bate mais
+    // com os resultados. Sem este aviso o admin não sabe que precisa recalcular.
+    const bracketStale = !!bracketSource && koMatches.length > 0 &&
+        planBracket(bracketSource.firstStage, bracketSource.pairs, matches).remove.length > 0
 
     const bracketActions = canEdit && bracketSource && (
         <div className="flex flex-col gap-2">
+            {bracketStale && (
+                <Alert tone="warning">
+                    Um placar foi corrigido e o chaveamento não bate mais com os resultados.
+                    Toque em "Recalcular confrontos" para atualizar.
+                </Alert>
+            )}
             {nextStage && (
                 <Button
                     fullWidth
@@ -302,7 +297,7 @@ export default function TournamentDashboard() {
             {koMatches.length > 0 && (
                 <>
                     <Button
-                        variant="secondary"
+                        variant={bracketStale ? 'primary' : 'secondary'}
                         fullWidth
                         icon={<RefreshCw size={16} className={generatingBracket ? 'animate-spin' : ''} />}
                         onClick={() => requestPlan()}
@@ -733,7 +728,9 @@ export default function TournamentDashboard() {
                     match={selectedMatch}
                     homeName={getEntityName(selectedMatch.home_id)}
                     awayName={getEntityName(selectedMatch.away_id)}
-                    onClose={() => { setSelectedMatch(null); if (id) fetchAll(id) }}
+                    onSaved={saved => setMatches(prev => prev.map(m => m.id === selectedMatch.id ? { ...m, ...saved } : m))}
+                    // silent: sem o skeleton a página não encolhe e o admin não volta para o topo a cada placar
+                    onClose={() => { setSelectedMatch(null); if (id) fetchAll(id, { silent: true }) }}
                 />
             )}
 
@@ -870,7 +867,7 @@ function PlanConfirmModal({ plan, getEntityName, working, onCancel, onConfirm }:
             <div className="flex flex-col gap-4">
                 {lostResults > 0 && (
                     <Alert>
-                        {lostResults} resultado{lostResults !== 1 ? 's' : ''} será{lostResults !== 1 ? 'ão' : ''} apagado{lostResults !== 1 ? 's' : ''}.
+                        {lostResults === 1 ? '1 resultado será apagado.' : `${lostResults} resultados serão apagados.`}{' '}
                         Os confrontos que não mudaram continuam com o placar.
                     </Alert>
                 )}

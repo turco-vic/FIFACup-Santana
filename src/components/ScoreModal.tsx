@@ -13,9 +13,12 @@ type Props = {
     homeName: string
     awayName: string
     onClose: () => void
+    // Resultado gravado: a tela atualiza na hora, sem esperar a recarga (senão, por um instante,
+    // o jogo ainda aparece "a jogar" e um toque rápido reabre o mesmo jogo vazio)
+    onSaved?: (saved: Pick<Match, 'home_score' | 'away_score' | 'home_penalties' | 'away_penalties' | 'played'>) => void
 }
 
-export default function ScoreModal({ match, homeName, awayName, onClose }: Props) {
+export default function ScoreModal({ match, homeName, awayName, onClose, onSaved }: Props) {
     const { showToast } = useToast()
     const [homeScore, setHomeScore] = useState(match.home_score?.toString() ?? '')
     const [awayScore, setAwayScore] = useState(match.away_score?.toString() ?? '')
@@ -71,6 +74,7 @@ export default function ScoreModal({ match, homeName, awayName, onClose }: Props
             setSaving(false)
             return
         }
+        onSaved?.({ home_score: hs, away_score: as_, home_penalties: hp, away_penalties: ap, played: true })
 
         // Título, texto e destinatários são definidos no servidor a partir da partida.
         // Falha no push não desfaz o resultado.

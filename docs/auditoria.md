@@ -124,3 +124,36 @@ Levantamento: comparação dos arquivos removidos na Fase 1 (`10db328^`) com o s
   - Dependências de `useEffect`: `fetchAll` do Dashboard e do Manage virou `useCallback`
     (`navigate`, `profile?.id`, `isSupreme`); Tournaments e TopScorers buscam dentro do efeito com `profileId`.
   - Fast refresh: contexto e `useToast` foram para `src/hooks/useToast.ts`; `ToastContext.tsx` só exporta o provider.
+
+## Véspera do evento (02/10/2026) — testes e correções
+
+Infra de teste nova (ver `tests/README.md`): vitest (160 testes de `src/lib`, ~97% de cobertura) e
+Playwright (58 E2E, desktop + iPhone 13) contra um Supabase local descartável sem Docker
+(`tests/e2e/local-stack`: Postgres 16 + PostgREST 14.5 + gateway que emula Auth/edge/storage, com o
+schema da Fase 0 e todas as migrations do repo). Produção não foi usada.
+
+Corrigido no front (falta deploy):
+- [x] Botão "Gerar <fase>" errado depois de um recálculo apagar parte de uma fase (dizia "Gerar Final"
+  e criava quarta/semi, ou respondia "Nada a gerar"). `nextStageToGenerate` em `src/lib/bracket.ts`.
+- [x] Aviso "o chaveamento não bate mais com os resultados" quando um placar é corrigido depois de
+  gerar a fase seguinte (antes nada avisava; "Recalcular confrontos" fica em destaque).
+- [x] Apagar partidas apaga os gols antes (`deleteMatches` em `src/lib/supabase.ts`): sem `ON DELETE
+  CASCADE` em `goals.match_id`, recalcular/regerar/resetar com resultados falhava com 23503.
+- [x] Recalcular com mata-mata duplicado mantém a cópia que tem placar.
+- [x] Tela pulava para o topo a cada placar salvo (recarga com skeleton) → recarga silenciosa + partida
+  atualizada na hora (sem a janela em que o jogo salvo ainda aparecia "a jogar").
+- [x] Painel do supreme atualiza sozinho (10 s e ao voltar ao app); bolinha de pendentes a cada 30 s.
+- [x] Código de convite colado com espaço/traço travava o botão "Buscar" (`normalizeInviteCode`).
+- [x] "Esqueci minha senha" dizia "Email enviado!" mesmo com o envio recusado (limite de e-mails).
+- [x] Link de reset que cai na raiz do site (Redirect URL fora da lista) agora abre `/reset-password`.
+- [x] Login: com rede lenta, quem tocava em outra tela logo após entrar era jogado de volta para a Home.
+- [x] Modal de recálculo escrevia "serão" como "seráão".
+- [x] Lógica pura extraída para `src/lib` (`groups.ts`, `inviteCode.ts`, `bracketFromGroups`) sem mudar regra.
+
+Para aplicar no banco (SQL editor), conferir antes com `supabase/scripts/20261002_vespera_conferir.sql`:
+- [ ] `supabase/migrations/20261002120000_vespera_evento.sql` — `goals.match_id` ON DELETE CASCADE (se
+  ainda não for) e índice único da vaga do mata-mata (dois aparelhos gerando a mesma fase duplicavam).
+  Rollback em `supabase/rollback/`.
+
+Decisão de regra em aberto: empate em pontos, saldo e gols pró é desempatado por ordem alfabética
+(sem confronto direto). Simulação: ~3–5% de chance de uma vaga de grupo ser decidida assim (4×5).

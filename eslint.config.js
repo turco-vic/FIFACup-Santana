@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'coverage', 'test-results', 'playwright-report']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -22,6 +22,15 @@ export default defineConfig([
     rules: {
       'react-hooks/set-state-in-effect': 'off',
       'react-hooks/immutability': 'off',
+    },
+  },
+  // Testes (vitest/Playwright) rodam no Node; fixtures do Playwright usam `use` e `{}`
+  {
+    files: ['tests/**/*.{ts,mjs}', '*.config.ts'],
+    languageOptions: { globals: globals.node },
+    rules: {
+      'react-hooks/rules-of-hooks': 'off',
+      'no-empty-pattern': 'off',
     },
   },
 ])

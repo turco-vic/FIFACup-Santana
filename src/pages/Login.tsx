@@ -19,6 +19,8 @@ export default function Login() {
     const [showPassword, setShowPassword] = useState(false)
     const [resetEmail, setResetEmail] = useState('')
     const [resetSent, setResetSent] = useState(false)
+    const [resetError, setResetError] = useState('')
+    const [sendingReset, setSendingReset] = useState(false)
     const [showReset, setShowReset] = useState(false)
 
     useEffect(() => {
@@ -35,10 +37,19 @@ export default function Login() {
     }, [loading, profile, navigate])
 
     async function handleResetPassword() {
-        if (!resetEmail) return
-        await supabase.auth.resetPasswordForEmail(resetEmail, {
+        if (!resetEmail.trim() || sendingReset) return
+        setResetError('')
+        setSendingReset(true)
+        // O envio pode ser recusado (ex.: limite de e-mails por hora do Supabase): avisa em vez de
+        // dizer "enviado" para alguém que vai ficar esperando um e-mail que não sai
+        const { error } = await supabase.auth.resetPasswordForEmail(resetEmail.trim(), {
             redirectTo: `${window.location.origin}/reset-password`,
         })
+        setSendingReset(false)
+        if (error) {
+            setResetError(translateAuthError(error, 'Não foi possível enviar o email. Tente de novo.'))
+            return
+        }
         setResetSent(true)
     }
 
@@ -51,7 +62,9 @@ export default function Login() {
             setSubmitting(false)
             return
         }
-        navigate('/', { replace: true })
+        // O efeito acima já leva para "/" quando o perfil carrega, às vezes antes desta resposta.
+        // Navegar de novo jogava de volta para a Home quem já tinha tocado em outra tela.
+        if (window.location.pathname === '/login') navigate('/', { replace: true })
     }
 
     return (
@@ -114,10 +127,11 @@ export default function Login() {
                         inputMode="email"
                         autoCapitalize="none"
                     />
+                    {resetError && <Alert>{resetError}</Alert>}
                     {resetSent ? (
                         <Alert tone="success">Email enviado! Verifique sua caixa de entrada.</Alert>
                     ) : (
-                        <Button variant="secondary" fullWidth onClick={handleResetPassword}>
+                        <Button variant="secondary" fullWidth onClick={handleResetPassword} loading={sendingReset}>
                             Enviar link de redefinição
                         </Button>
                     )}

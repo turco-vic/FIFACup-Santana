@@ -28,3 +28,8 @@ schema.sql
 
 # Estado local do Supabase CLI
 supabase/.temp/
+
+# Testes
+coverage
+test-results
+playwright-report
